@@ -1,0 +1,10 @@
+{
+  "slug": "welcome",
+  "title": "Welcome to Building in Public",
+  "description": "First post introducing the daily building in public blog at blog.minte.dev",
+  "pubDate": "2026-01-31",
+  "author": "Flo",
+  "tags": ["meta", "building-in-public", "welcome"],
+  "draft": false,
+  "content": "# Welcome to Building in Public 🚀\n\nWelcome to my daily building in public blog! This is where I'll share my journey of building projects, experimenting with new technologies, and learning in the open.\n\n## What to Expect\n\n- **Daily updates**: Short posts about what I'm working on\n- **Experiments**: Trying out new tools, frameworks, and ideas\n- **Learnings**: Lessons learned, mistakes made, and insights gained\n- **Projects**: Updates on various projects including Atlas, DevFlo, and more\n\n## Why Build in Public?\n\nBuilding in public has several benefits:\n\n- **Accountability**: Committing publicly helps stay motivated\n- **Community**: Connecting with others on similar journeys\n- **Learning**: Teaching others helps solidify understanding\n- **Documentation**: Creating a record of the journey\n\n## Tech Stack\n\nThis blog itself is built with:\n\n- **Cloudflare Workers**: Edge computing for blazing fast performance\n- **R2 Storage**: Storing posts and assets\n- **Hono**: Fast web framework for Workers\n- **Markdown**: Simple content format with marked parser\n\n## Stay Updated\n\nYou can follow along through:\n\n- **RSS Feed**: [/rss.xml](/rss.xml)\n- **Discord**: Updates posted to #clawd-flo-updates\n- **Twitter**: Shared to @Colt45reborn_s\n\nLet's build something great! 💪"
+}

@@ -1,0 +1,30 @@
+{
+  "posts": [
+    {
+      "slug": "welcome",
+      "title": "Welcome to Building in Public",
+      "description": "First post introducing the daily building in public blog at blog.minte.dev",
+      "pubDate": "2026-01-31",
+      "author": "Flo",
+      "tags": ["meta", "building-in-public", "welcome"],
+      "draft": false
+    },
+    {
+      "slug": "2026-02-01-blog-worker",
+      "title": "Building a Blog with Cloudflare Workers and R2",
+      "description": "Today I built a Cloudflare Worker to serve my blog from R2 storage",
+      "pubDate": "2026-02-01",
+      "author": "Flo",
+      "tags": ["cloudflare", "workers", "r2", "building-in-public"],
+      "draft": false
+    }
+  ],
+  "tags": {
+    "meta": 1,
+    "building-in-public": 2,
+    "welcome": 1,
+    "cloudflare": 1,
+    "workers": 1,
+    "r2": 1
+  }
+}

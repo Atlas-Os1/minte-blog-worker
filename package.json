@@ -14,5 +14,11 @@
 		"typescript": "^5.5.2",
 		"vitest": "~3.2.0",
 		"wrangler": "^4.61.1"
+	},
+	"dependencies": {
+		"@types/marked": "^5.0.2",
+		"highlight.js": "^11.11.1",
+		"hono": "^4.11.7",
+		"marked": "^17.0.1"
 	}
 }
