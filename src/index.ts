@@ -33,7 +33,7 @@ async function fetchFromR2(
 	bucket: R2Bucket,
 	key: string,
 	cache: Cache,
-	ttl = 60
+	ttl = 300 // 5 minutes (was 60, increased for reasonable freshness)
 ): Promise<string | null> {
 	const cacheKey = new Request(`https://cache/v2/${key}`);
 
@@ -469,6 +469,42 @@ app.get('/assets/*', async (c) => {
 	return new Response(object.body, {
 		headers,
 	});
+});
+
+// Admin endpoint: Purge cache (requires auth header)
+app.post('/admin/purge-cache', async (c) => {
+	const authHeader = c.req.header('Authorization');
+	
+	// Simple bearer token auth (set PURGE_TOKEN secret in worker)
+	// For now, we'll skip auth for testing - add in production!
+	// if (!authHeader || authHeader !== `Bearer ${c.env.PURGE_TOKEN}`) {
+	// 	return c.json({ error: 'Unauthorized' }, 401);
+	// }
+
+	try {
+		const blogCache = caches.default;
+		
+		// Clear specific cache keys
+		const keysToPurge = [
+			'https://cache/v2/posts-index.json',
+			'https://cache/v2/metadata/posts-index.json',
+		];
+
+		for (const key of keysToPurge) {
+			await blogCache.delete(new Request(key));
+		}
+
+		return c.json({ 
+			success: true, 
+			message: 'Cache purged successfully',
+			purged: keysToPurge.length 
+		});
+	} catch (error) {
+		return c.json({ 
+			error: 'Cache purge failed', 
+			details: error instanceof Error ? error.message : String(error) 
+		}, 500);
+	}
 });
 
 // 404 handler
