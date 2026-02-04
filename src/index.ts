@@ -28,14 +28,14 @@ const app = new Hono<{ Bindings: Bindings }>();
 // CORS for API endpoints
 app.use('/api/*', cors());
 
-// Helper: Fetch from R2 with cache
+// Helper: Fetch from R2 with cache (v2 - cache busted)
 async function fetchFromR2(
 	bucket: R2Bucket,
 	key: string,
 	cache: Cache,
-	ttl = 3600
+	ttl = 60
 ): Promise<string | null> {
-	const cacheKey = new Request(`https://cache/${key}`);
+	const cacheKey = new Request(`https://cache/v2/${key}`);
 
 	// Check cache first
 	const cachedResponse = await cache.match(cacheKey);
@@ -71,46 +71,90 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>${title} - Minte Blog</title>
+	<link rel="icon" type="image/png" href="https://pub-0be86ba29d2f4e66b59fe97deb2ea9d3.r2.dev/assets/favicon.png">
 	${metaTags}
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 	<style>
+		:root {
+			--bg-primary: #f5f5f5;
+			--bg-secondary: white;
+			--text-primary: #333;
+			--text-secondary: #666;
+			--accent: #FF6B35;
+			--border: #eee;
+			--code-bg: #1e1e1e;
+			--tag-bg: #e8f4f8;
+			--tag-text: #0066cc;
+		}
+		
+		[data-theme="dark"] {
+			--bg-primary: #1a1a1a;
+			--bg-secondary: #2a2a2a;
+			--text-primary: #e0e0e0;
+			--text-secondary: #aaa;
+			--accent: #FF6B35;
+			--border: #444;
+			--code-bg: #0d0d0d;
+			--tag-bg: #2a3a4a;
+			--tag-text: #4a9eff;
+		}
+		
 		* { margin: 0; padding: 0; box-sizing: border-box; }
 		body { 
 			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 			line-height: 1.6;
-			color: #333;
-			background: #f5f5f5;
+			color: var(--text-primary);
+			background: var(--bg-primary);
 			padding: 20px;
+			transition: background 0.3s, color 0.3s;
 		}
 		.container { 
 			max-width: 800px; 
 			margin: 0 auto; 
-			background: white;
+			background: var(--bg-secondary);
 			padding: 40px;
 			border-radius: 8px;
 			box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 		}
 		header { margin-bottom: 40px; }
-		h1 { font-size: 2.5rem; margin-bottom: 10px; color: #111; }
-		h2 { font-size: 2rem; margin: 30px 0 15px; color: #222; }
-		h3 { font-size: 1.5rem; margin: 25px 0 10px; color: #333; }
-		a { color: #0066cc; text-decoration: none; }
+		h1 { font-size: 2.5rem; margin-bottom: 10px; color: var(--text-primary); }
+		h2 { font-size: 2rem; margin: 30px 0 15px; color: var(--text-primary); }
+		h3 { font-size: 1.5rem; margin: 25px 0 10px; color: var(--text-primary); }
+		a { color: var(--tag-text); text-decoration: none; }
 		a:hover { text-decoration: underline; }
-		.post-meta { color: #666; font-size: 0.9rem; margin-bottom: 20px; }
+		.post-meta { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px; }
 		.tag { 
-			background: #e8f4f8;
-			color: #0066cc;
+			background: var(--tag-bg);
+			color: var(--tag-text);
 			padding: 4px 12px;
 			border-radius: 4px;
 			font-size: 0.85rem;
 			margin-right: 8px;
 			display: inline-block;
 		}
+		.theme-toggle {
+			position: fixed;
+			top: 20px;
+			right: 20px;
+			background: var(--accent);
+			color: white;
+			border: none;
+			padding: 10px 16px;
+			border-radius: 20px;
+			cursor: pointer;
+			font-size: 1.2rem;
+			box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+			transition: transform 0.2s;
+			z-index: 1000;
+		}
+		.theme-toggle:hover {
+			transform: scale(1.1);
+		}
 		.post-list { list-style: none; }
 		.post-item { 
 			margin-bottom: 30px;
 			padding-bottom: 30px;
-			border-bottom: 1px solid #eee;
+			border-bottom: 1px solid var(--border);
 		}
 		.post-item:last-child { border-bottom: none; }
 		.post-title { font-size: 1.5rem; margin-bottom: 8px; }
@@ -118,7 +162,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.nav a { margin-right: 20px; }
 		img { max-width: 100%; height: auto; border-radius: 4px; }
 		pre { 
-			background: #1e1e1e;
+			background: var(--code-bg);
 			padding: 16px;
 			border-radius: 6px;
 			overflow-x: auto;
@@ -127,19 +171,21 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		code { 
 			font-family: 'Courier New', monospace;
 			font-size: 0.9rem;
+			color: var(--text-primary);
 		}
 		p { margin: 15px 0; }
 		ul, ol { margin: 15px 0 15px 30px; }
 		blockquote {
-			border-left: 4px solid #0066cc;
+			border-left: 4px solid var(--accent);
 			padding-left: 20px;
 			margin: 20px 0;
-			color: #555;
+			color: var(--text-secondary);
 			font-style: italic;
 		}
 	</style>
 </head>
 <body>
+	<button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle">🌙</button>
 	<div class="container">
 		<nav class="nav">
 			<a href="/">Home</a>
@@ -150,6 +196,27 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 	</div>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 	<script>hljs.highlightAll();</script>
+	<script>
+		// Theme toggle functionality
+		function toggleTheme() {
+			const html = document.documentElement;
+			const currentTheme = html.getAttribute('data-theme');
+			const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+			const btn = document.getElementById('theme-toggle');
+			
+			html.setAttribute('data-theme', newTheme);
+			localStorage.setItem('theme', newTheme);
+			btn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+		}
+		
+		// Load saved theme
+		(function() {
+			const savedTheme = localStorage.getItem('theme') || 'light';
+			const btn = document.getElementById('theme-toggle');
+			document.documentElement.setAttribute('data-theme', savedTheme);
+			btn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+		})();
+	</script>
 </body>
 </html>`;
 }
@@ -383,6 +450,24 @@ app.get('/api/posts/:slug', async (c) => {
 
 	return c.json(post, 200, {
 		'Cache-Control': 'public, max-age=3600',
+	});
+});
+
+// Assets route: Serve static files from R2 assets/ folder
+app.get('/assets/*', async (c) => {
+	const path = c.req.path.replace('/assets/', 'assets/');
+	const object = await c.env.BLOG_BUCKET.get(path);
+
+	if (!object) {
+		return c.notFound();
+	}
+
+	const headers = new Headers();
+	object.writeHttpMetadata(headers);
+	headers.set('Cache-Control', 'public, max-age=31536000'); // 1 year cache for assets
+
+	return new Response(object.body, {
+		headers,
 	});
 });
 
