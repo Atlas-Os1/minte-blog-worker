@@ -2,10 +2,13 @@ import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import { marked } from 'marked';
 import { cors } from 'hono/cors';
+import { generateBlogPost, publishPost } from './manual-blog-gen';
 
 type Bindings = {
 	BLOG_BUCKET: R2Bucket;
 	BLOG_WORKFLOW: Workflow;
+	CF_ZONE_ID: string;
+	CLOUDFLARE_API_TOKEN: string;
 };
 
 type BlogPost = {
@@ -508,20 +511,37 @@ app.post('/admin/purge-cache', async (c) => {
 	}
 });
 
-// Admin endpoint: Trigger blog workflow manually
-app.post('/admin/trigger-workflow', async (c) => {
+// Admin endpoint: Trigger blog generation manually (simplified version)
+app.post('/admin/generate-blog', async (c) => {
 	try {
-		// Create workflow instance
-		const instance = await c.env.BLOG_WORKFLOW.create();
+		// Generate blog post
+		const post = await generateBlogPost(c.env.BLOG_BUCKET);
+		
+		// Publish to R2 + update index + purge cache
+		const result = await publishPost(
+			c.env.BLOG_BUCKET,
+			post,
+			c.env.CF_ZONE_ID,
+			c.env.CLOUDFLARE_API_TOKEN
+		);
+		
+		if (!result.success) {
+			return c.json({ 
+				error: 'Blog publish failed', 
+				details: result.error 
+			}, 500);
+		}
 		
 		return c.json({ 
 			success: true, 
-			message: 'Blog workflow triggered',
-			instanceId: instance.id
+			message: 'Blog post generated and published',
+			url: result.url,
+			title: post.title,
+			slug: post.slug
 		});
 	} catch (error) {
 		return c.json({ 
-			error: 'Workflow trigger failed', 
+			error: 'Blog generation failed', 
 			details: error instanceof Error ? error.message : String(error) 
 		}, 500);
 	}
