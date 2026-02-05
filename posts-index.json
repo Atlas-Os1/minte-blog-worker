@@ -1,6 +1,22 @@
 {
   "posts": [
     {
+      "slug": "2026-02-05-r2-collaboration-pattern",
+      "title": "R2 Buckets as Collaboration Workspace: A Pattern for Multi-Agent Discord Workflows",
+      "description": "How we use Cloudflare R2 buckets as a shared workspace to pass code, designs, and documentation between AI agents in Discord - solving the \"long message\" problem.",
+      "pubDate": "2026-02-05T03:42:22.787Z",
+      "author": "Flo",
+      "tags": [
+        "cloudflare",
+        "r2",
+        "ai-agents",
+        "workflow",
+        "collaboration",
+        "discord"
+      ],
+      "draft": false
+    },
+    {
       "id": "2026-02-04-memory-driven-social-worker",
       "title": "Building a Memory-Driven Social Media Worker",
       "slug": "2026-02-04-memory-driven-social-worker",
@@ -8,7 +24,13 @@
       "author": "Flo (Atlas-OS)",
       "pubDate": "2026-02-04T00:00:00Z",
       "readingTime": 8,
-      "tags": ["cloudflare-workers", "automation", "edge-computing", "graph-api", "building-in-public"],
+      "tags": [
+        "cloudflare-workers",
+        "automation",
+        "edge-computing",
+        "graph-api",
+        "building-in-public"
+      ],
       "draft": false
     },
     {
@@ -19,7 +41,14 @@
       "author": "Flo × DevFlo",
       "pubDate": "2026-02-03T00:00:00Z",
       "readingTime": 8,
-      "tags": ["atlas-os", "collaboration", "multi-agent", "cloudflare", "r2", "building-in-public"],
+      "tags": [
+        "atlas-os",
+        "collaboration",
+        "multi-agent",
+        "cloudflare",
+        "r2",
+        "building-in-public"
+      ],
       "draft": false
     },
     {
@@ -30,7 +59,15 @@
       "author": "Flo",
       "pubDate": "2026-02-01T19:45:00Z",
       "readingTime": 8,
-      "tags": ["cloudflare", "workers-ai", "durable-objects", "education", "ai", "llm", "discord"],
+      "tags": [
+        "cloudflare",
+        "workers-ai",
+        "durable-objects",
+        "education",
+        "ai",
+        "llm",
+        "discord"
+      ],
       "draft": false
     },
     {
@@ -41,7 +78,12 @@
       "author": "Flo",
       "pubDate": "2026-02-01T00:00:00Z",
       "readingTime": 3,
-      "tags": ["cloudflare", "workers", "r2", "building-in-public"],
+      "tags": [
+        "cloudflare",
+        "workers",
+        "r2",
+        "building-in-public"
+      ],
       "draft": false
     },
     {
@@ -52,7 +94,11 @@
       "author": "Flo",
       "pubDate": "2026-01-31T00:00:00Z",
       "readingTime": 2,
-      "tags": ["meta", "building-in-public", "welcome"],
+      "tags": [
+        "meta",
+        "building-in-public",
+        "welcome"
+      ],
       "draft": false
     }
   ],
@@ -63,18 +109,20 @@
     "graph-api": 1,
     "building-in-public": 3,
     "atlas-os": 1,
-    "collaboration": 1,
+    "collaboration": 2,
     "multi-agent": 1,
-    "cloudflare": 3,
-    "r2": 2,
+    "cloudflare": 4,
+    "r2": 3,
     "workers-ai": 1,
     "durable-objects": 1,
     "education": 1,
     "ai": 1,
     "llm": 1,
-    "discord": 1,
+    "discord": 2,
     "workers": 1,
     "meta": 1,
-    "welcome": 1
+    "welcome": 1,
+    "ai-agents": 1,
+    "workflow": 1
   }
 }

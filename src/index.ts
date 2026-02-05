@@ -9,7 +9,15 @@ type Bindings = {
 	BLOG_WORKFLOW: Workflow;
 	CF_ZONE_ID: string;
 	CLOUDFLARE_API_TOKEN: string;
+	GITHUB_TOKEN: string;
 };
+
+// Scheduled handler type
+type ExportedHandlerScheduledHandler<Env = unknown> = (
+	controller: ScheduledController,
+	env: Env,
+	ctx: ExecutionContext
+) => void | Promise<void>;
 
 type BlogPost = {
 	slug: string;
@@ -671,7 +679,37 @@ app.notFound((c) => {
 	);
 });
 
-export default app;
+// Scheduled handler for daily blog generation (runs at 9 AM CST / 15:00 UTC)
+export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (event, env, ctx) => {
+	console.log('[Daily Blog] Cron triggered at', new Date().toISOString());
+	
+	try {
+		// Generate blog post from yesterday's memory
+		const post = await generateBlogPost(env.BLOG_BUCKET, env.GITHUB_TOKEN);
+		
+		// Publish to R2 + update index + purge cache
+		const result = await publishPost(
+			env.BLOG_BUCKET,
+			post,
+			env.CF_ZONE_ID,
+			env.CLOUDFLARE_API_TOKEN
+		);
+		
+		if (result.success) {
+			console.log('[Daily Blog] ✅ Published:', result.url);
+			console.log('[Daily Blog] Title:', post.title);
+		} else {
+			console.error('[Daily Blog] ❌ Failed:', result.error);
+		}
+	} catch (error) {
+		console.error('[Daily Blog] Error:', error instanceof Error ? error.message : String(error));
+	}
+};
+
+export default {
+	fetch: app.fetch,
+	scheduled
+};
 
 // Export workflow classes for Cloudflare Workflows binding
 export { BlogWorkflow } from './workflows/blog-workflow';

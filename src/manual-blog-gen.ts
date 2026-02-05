@@ -18,10 +18,104 @@ export interface PostIndex {
   tags: Record<string, number>;
 }
 
-export async function generateBlogPost(bucket: R2Bucket): Promise<SimpleBlogPost> {
+interface MemoryHighlight {
+  date: string;
+  content: string;
+  headers: string[];
+}
+
+async function parseMemoryFile(bucket: R2Bucket, date: string): Promise<MemoryHighlight | null> {
+  try {
+    const obj = await bucket.get(`workspace/memory/${date}.md`);
+    if (!obj) return null;
+    
+    const content = await obj.text();
+    const headers = content.match(/^##? .+$/gm) || [];
+    
+    return {
+      date,
+      content: content.slice(0, 1000), // First 1000 chars for context
+      headers: headers.map(h => h.replace(/^##? /, ''))
+    };
+  } catch (error) {
+    console.error(`Failed to parse memory for ${date}:`, error);
+    return null;
+  }
+}
+
+async function fetchGitHubActivity(token: string): Promise<string> {
+  // Placeholder - will implement GitHub API calls
+  return 'No GitHub activity fetched yet';
+}
+
+export async function generateBlogPost(bucket: R2Bucket, githubToken?: string): Promise<SimpleBlogPost> {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateStr = yesterday.toISOString().split('T')[0];
+  
+  // Parse yesterday's memory
+  const memory = await parseMemoryFile(bucket, dateStr);
+  
+  // Determine content based on what we have
+  let title = `Daily Update - ${dateStr}`;
+  let description = 'Daily development update from Flo';
+  let content = '';
+  let tags = ['daily-update', 'development'];
+  
+  if (memory && memory.headers.length > 0) {
+    // Build blog from memory
+    title = `${memory.headers[0]} - Daily Update`;
+    description = `Highlights from ${dateStr}: ${memory.headers.slice(0, 3).join(', ')}`;
+    tags = ['daily-update', 'development', 'building-in-public'];
+    
+    content = `# ${title}
+
+## What Happened on ${dateStr}
+
+${memory.headers.map((h, i) => `${i + 1}. **${h}**`).join('\n')}
+
+---
+
+${memory.content}
+
+---
+
+**Development Notes:** Daily log automatically generated from workspace memory files.
+
+🦞 *- Flo*`;
+  } else {
+    // Fallback: simple update
+    title = 'Building in Public - Daily Update';
+    description = 'Another day of development and learning';
+    tags = ['daily-update'];
+    content = `# Building in Public
+
+No major activities logged for ${dateStr}.
+
+Continuing development work across various projects.
+
+🦞 *- Flo*`;
+  }
+  
+  const post: SimpleBlogPost = {
+    slug: `${dateStr}-daily-update`,
+    title,
+    description,
+    pubDate: new Date().toISOString(),
+    author: 'Flo',
+    tags,
+    content,
+    draft: false
+  };
+
+  return post;
+}
+
+// Keep the old R2 collaboration post function for reference
+export async function generateR2CollaborationPost(bucket: R2Bucket): Promise<SimpleBlogPost> {
   const today = new Date().toISOString().split('T')[0];
   
-  // Simple blog post about R2 collaboration pattern
   const post: SimpleBlogPost = {
     slug: `${today}-r2-collaboration-pattern`,
     title: 'R2 Buckets as Collaboration Workspace: A Pattern for Multi-Agent Discord Workflows',
