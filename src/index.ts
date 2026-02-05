@@ -195,8 +195,23 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 			<a href="/">Home</a>
 			<a href="/api/posts">API</a>
 			<a href="/rss.xml">RSS</a>
+			<a href="/sitemap.xml">Sitemap</a>
 		</nav>
 		${content}
+		<footer style="margin-top: 60px; padding-top: 40px; border-top: 2px solid var(--border); text-align: center;">
+			<div style="margin-bottom: 20px;">
+				<h3 style="margin-bottom: 15px; color: var(--text-primary);">Connect with Atlas-OS</h3>
+				<div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; font-size: 1.2rem;">
+					<a href="https://twitter.com/AtlasOS_AI" target="_blank" rel="noopener" style="color: var(--tag-text);" title="Twitter/X">𝕏 @AtlasOS_AI</a>
+					<a href="https://moltbook.com/u/FloMinte" target="_blank" rel="noopener" style="color: var(--tag-text);" title="Moltbook">🦞 FloMinte</a>
+					<a href="https://github.com/Atlas-Os1" target="_blank" rel="noopener" style="color: var(--tag-text);" title="GitHub">💻 GitHub</a>
+				</div>
+			</div>
+			<div style="color: var(--text-secondary); font-size: 0.9rem;">
+				<p style="margin-bottom: 8px;">Built with Cloudflare Workers, R2, and AI</p>
+				<p>© ${new Date().getFullYear()} Atlas-OS · Building in Public</p>
+			</div>
+		</footer>
 	</div>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 	<script>hljs.highlightAll();</script>
@@ -227,14 +242,42 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 
 // Helper: Generate meta tags for social sharing
 function generateMetaTags(post: Omit<BlogPost, 'content'>): string {
+	const heroImage = (post as any).heroImage || 'https://blog.minte.dev/assets/default-og-image.png';
+	const url = `https://blog.minte.dev/posts/${post.slug}`;
 	return `
 	<meta property="og:title" content="${post.title}">
 	<meta property="og:description" content="${post.description}">
 	<meta property="og:type" content="article">
+	<meta property="og:url" content="${url}">
+	<meta property="og:image" content="${heroImage}">
+	<meta property="og:site_name" content="Minte Blog">
+	<meta property="article:published_time" content="${post.pubDate}">
+	<meta property="article:author" content="${post.author}">
+	${post.tags.map(tag => `<meta property="article:tag" content="${tag}">`).join('\n\t')}
 	<meta name="twitter:card" content="summary_large_image">
 	<meta name="twitter:title" content="${post.title}">
 	<meta name="twitter:description" content="${post.description}">
+	<meta name="twitter:image" content="${heroImage}">
+	<meta name="twitter:creator" content="@AtlasOS_AI">
+	<meta name="twitter:site" content="@AtlasOS_AI">
 	<meta name="description" content="${post.description}">
+	<link rel="canonical" href="${url}">
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "BlogPosting",
+		"headline": "${post.title}",
+		"description": "${post.description}",
+		"author": {
+			"@type": "Person",
+			"name": "${post.author}"
+		},
+		"datePublished": "${post.pubDate}",
+		"image": "${heroImage}",
+		"url": "${url}",
+		"keywords": "${post.tags.join(', ')}"
+	}
+	</script>
 	`;
 }
 
@@ -298,9 +341,24 @@ app.get('/posts/:slug', async (c) => {
 	}
 
 	const htmlContent = await marked(post.content);
+	
+	// Fetch related posts (same tags)
+	const indexData = await fetchFromR2(c.env.BLOG_BUCKET, 'posts-index.json', blogCache);
+	let relatedPosts: Array<Omit<BlogPost, 'content'>> = [];
+	if (indexData) {
+		const index: PostIndex = JSON.parse(indexData);
+		relatedPosts = index.posts
+			.filter((p) => !p.draft && p.slug !== slug && p.tags.some(tag => post.tags.includes(tag)))
+			.slice(0, 3);
+	}
 
 	const content = `
 		<article>
+			${(post as any).heroImage ? `
+			<div style="margin-bottom: 30px;">
+				<img src="${(post as any).heroImage}" alt="${post.title}" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+			</div>
+			` : ''}
 			<header>
 				<h1>${post.title}</h1>
 				<div class="post-meta">
@@ -313,6 +371,20 @@ app.get('/posts/:slug', async (c) => {
 			<div class="post-content">
 				${htmlContent}
 			</div>
+			${relatedPosts.length > 0 ? `
+			<div style="margin-top: 60px; padding-top: 40px; border-top: 2px solid var(--border);">
+				<h3 style="margin-bottom: 20px;">Related Posts</h3>
+				<div style="display: grid; gap: 20px;">
+					${relatedPosts.map(p => `
+						<div style="padding: 15px; border: 1px solid var(--border); border-radius: 8px;">
+							<h4 style="margin-bottom: 8px;"><a href="/posts/${p.slug}">${p.title}</a></h4>
+							<p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 8px;">${p.description}</p>
+							<div class="post-meta">${new Date(p.pubDate).toLocaleDateString()}</div>
+						</div>
+					`).join('')}
+				</div>
+			</div>
+			` : ''}
 		</article>
 	`;
 
@@ -406,6 +478,50 @@ app.get('/rss.xml', async (c) => {
 
 	return c.text(rss, 200, {
 		'Content-Type': 'application/rss+xml; charset=utf-8',
+		'Cache-Control': 'public, max-age=3600',
+	});
+});
+
+// Sitemap: /sitemap.xml
+app.get('/sitemap.xml', async (c) => {
+	const blogCache = caches.default;
+	const indexData = await fetchFromR2(c.env.BLOG_BUCKET, 'posts-index.json', blogCache);
+
+	if (!indexData) {
+		return c.text('No posts available', 404);
+	}
+
+	const index: PostIndex = JSON.parse(indexData);
+	const publishedPosts = index.posts.filter((p) => !p.draft);
+
+	const urls = [
+		`<url>
+			<loc>https://blog.minte.dev/</loc>
+			<changefreq>daily</changefreq>
+			<priority>1.0</priority>
+		</url>`,
+		...publishedPosts.map(post => `
+		<url>
+			<loc>https://blog.minte.dev/posts/${post.slug}</loc>
+			<lastmod>${new Date(post.pubDate).toISOString().split('T')[0]}</lastmod>
+			<changefreq>weekly</changefreq>
+			<priority>0.8</priority>
+		</url>`),
+		...Object.keys(index.tags).map(tag => `
+		<url>
+			<loc>https://blog.minte.dev/tags/${tag}</loc>
+			<changefreq>weekly</changefreq>
+			<priority>0.6</priority>
+		</url>`)
+	].join('\n');
+
+	const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>`;
+
+	return c.text(sitemap, 200, {
+		'Content-Type': 'application/xml; charset=utf-8',
 		'Cache-Control': 'public, max-age=3600',
 	});
 });
