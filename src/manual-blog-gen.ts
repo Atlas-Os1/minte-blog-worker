@@ -321,7 +321,7 @@ export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId
       index = { posts: [], tags: {} };
     }
     
-    // Prepend new post (newest first)
+    // Update or add post (prevent duplicates)
     const postMeta = {
       slug: post.slug,
       title: post.title,
@@ -332,6 +332,10 @@ export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId
       draft: post.draft
     };
     
+    // Remove existing post with same slug (if any)
+    index.posts = index.posts.filter(p => p.slug !== post.slug);
+    
+    // Add new/updated post at the beginning (newest first)
     index.posts.unshift(postMeta);
     
     // Update tag counts
