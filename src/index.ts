@@ -516,3 +516,6 @@ app.notFound((c) => {
 });
 
 export default app;
+
+// Export workflow classes for Cloudflare Workflows binding
+export { BlogWorkflow } from './workflows/blog-workflow';
