@@ -43,9 +43,16 @@ async function parseMemoryFile(bucket: R2Bucket, date: string): Promise<MemoryHi
   }
 }
 
-async function fetchGitHubActivity(token: string): Promise<string> {
-  // Placeholder - will implement GitHub API calls
-  return 'No GitHub activity fetched yet';
+async function fetchGitHubActivity(bucket: R2Bucket, date: string): Promise<string> {
+  try {
+    const obj = await bucket.get(`workspace/github/${date}.md`);
+    if (!obj) return '';
+    
+    return await obj.text();
+  } catch (error) {
+    console.error(`Failed to fetch GitHub activity for ${date}:`, error);
+    return '';
+  }
 }
 
 export async function generateBlogPost(bucket: R2Bucket, githubToken?: string): Promise<SimpleBlogPost> {
@@ -56,6 +63,9 @@ export async function generateBlogPost(bucket: R2Bucket, githubToken?: string): 
   
   // Parse yesterday's memory
   const memory = await parseMemoryFile(bucket, dateStr);
+  
+  // Fetch GitHub activity
+  const githubActivity = await fetchGitHubActivity(bucket, dateStr);
   
   // Determine content based on what we have
   let title = `Daily Update - ${dateStr}`;
@@ -81,7 +91,9 @@ ${memory.content}
 
 ---
 
-**Development Notes:** Daily log automatically generated from workspace memory files.
+${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` : ''}
+
+**Development Notes:** Daily log automatically generated from workspace memory files${githubActivity ? ' and GitHub activity' : ''}.
 
 🦞 *- Flo*`;
   } else {
@@ -94,6 +106,8 @@ ${memory.content}
 No major activities logged for ${dateStr}.
 
 Continuing development work across various projects.
+
+${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` : ''}
 
 🦞 *- Flo*`;
   }
