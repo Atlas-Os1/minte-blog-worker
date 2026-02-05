@@ -21,6 +21,13 @@
 			"pattern": "blog.minte.dev",
 			"custom_domain": true
 		}
+	],
+	"workflows": [
+		{
+			"name": "blog-workflow",
+			"binding": "BLOG_WORKFLOW",
+			"class_name": "BlogWorkflow"
+		}
 	]
 	/**
 	 * Smart Placement
