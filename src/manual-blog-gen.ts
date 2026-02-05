@@ -95,7 +95,9 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
 
 **Development Notes:** Daily log automatically generated from workspace memory files${githubActivity ? ' and GitHub activity' : ''}.
 
-🦞 *- Flo*`;
+---
+
+![Flo's Signature](https://blog.minte.dev/assets/branding/author-signature-flo.svg)`;
   } else {
     // Fallback: simple update
     title = 'Building in Public - Daily Update';
@@ -109,9 +111,19 @@ Continuing development work across various projects.
 
 ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` : ''}
 
-🦞 *- Flo*`;
+---
+
+![Flo's Signature](https://blog.minte.dev/assets/branding/author-signature-flo.svg)`;
   }
   
+  // TODO: Generate hero image using atlas-warhol when API is working
+  // python3 /home/flo/.clawdbot/skills/frontend/atlas-warhol/scripts/generate_enhanced.py \
+  //   --prompt "pop art daily update for ${dateStr}, vibrant tech aesthetic" \
+  //   --width 1200 --height 630 \
+  //   --output "daily-update-${dateStr}" \
+  //   --store-r2
+  // Then set heroImage to the R2 public URL
+
   const post: SimpleBlogPost = {
     slug: `${dateStr}-daily-update`,
     title,
@@ -121,6 +133,7 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
     tags,
     content,
     draft: false
+    // heroImage: 'https://pub-748cd0b5fd7d4d38a0c3ad5c09d205ae.r2.dev/skills/art_bucket/daily-update-${dateStr}.png'
   };
 
   return post;
