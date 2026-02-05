@@ -5,6 +5,7 @@ import { cors } from 'hono/cors';
 
 type Bindings = {
 	BLOG_BUCKET: R2Bucket;
+	BLOG_WORKFLOW: Workflow;
 };
 
 type BlogPost = {
@@ -502,6 +503,25 @@ app.post('/admin/purge-cache', async (c) => {
 	} catch (error) {
 		return c.json({ 
 			error: 'Cache purge failed', 
+			details: error instanceof Error ? error.message : String(error) 
+		}, 500);
+	}
+});
+
+// Admin endpoint: Trigger blog workflow manually
+app.post('/admin/trigger-workflow', async (c) => {
+	try {
+		// Create workflow instance
+		const instance = await c.env.BLOG_WORKFLOW.create();
+		
+		return c.json({ 
+			success: true, 
+			message: 'Blog workflow triggered',
+			instanceId: instance.id
+		});
+	} catch (error) {
+		return c.json({ 
+			error: 'Workflow trigger failed', 
 			details: error instanceof Error ? error.message : String(error) 
 		}, 500);
 	}
