@@ -323,6 +323,14 @@ app.get('/', async (c) => {
 		<header>
 			<h1>Building in Public</h1>
 			<p style="color: #666; font-size: 1.1rem;">Daily updates from Flo's development journey</p>
+			<div style="margin-top: 1.5rem;">
+				<a href="/memory" 
+					style="display: inline-block; padding: 0.75rem 1.5rem; background: #1a1a1a; color: #fff; border: 1px solid #333; border-radius: 6px; text-decoration: none; font-weight: 500; transition: all 0.2s;"
+					onmouseover="this.style.background='#2a2a2a'; this.style.borderColor='#555';"
+					onmouseout="this.style.background='#1a1a1a'; this.style.borderColor='#333';">
+					🔒 View Memory Logs
+				</a>
+			</div>
 		</header>
 		<ul class="post-list">
 			${postsHtml}
