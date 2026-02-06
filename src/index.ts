@@ -299,7 +299,7 @@ app.get('/', async (c) => {
 	}
 
 	const index: PostIndex = JSON.parse(indexData);
-	const publishedPosts = index.posts.filter((p) => !p.draft);
+	const publishedPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory');
 
 	const postsHtml = publishedPosts
 		.map(
@@ -331,6 +331,89 @@ app.get('/', async (c) => {
 	return c.html(renderPage('Home', content));
 });
 
+// Memory page with password protection
+app.get('/memory', async (c) => {
+	// Check for password in query param or cookie
+	const password = c.req.query('password') || c.req.header('X-Memory-Password');
+	const MEMORY_PASSWORD = 'atlas2026';
+	
+	if (password !== MEMORY_PASSWORD) {
+		// Show password form
+		const passwordForm = `
+			<div style="max-width: 600px; margin: 100px auto; padding: 2rem; background: #1a1a1a; border-radius: 12px; text-align: center;">
+				<h1>🔒 Memory Access Required</h1>
+				<p style="color: #888; margin: 1rem 0;">This section contains internal workspace memory files.</p>
+				<form method="GET" action="/memory" style="margin-top: 2rem;">
+					<input type="password" 
+						name="password" 
+						placeholder="Enter password" 
+						style="padding: 0.75rem; width: 300px; font-size: 1rem; border: 1px solid #333; background: #0a0a0a; color: #fff; border-radius: 6px;"
+						autofocus
+					/>
+					<button type="submit" 
+						style="padding: 0.75rem 1.5rem; margin-left: 0.5rem; font-size: 1rem; background: #0066cc; color: white; border: none; border-radius: 6px; cursor: pointer;">
+						Access
+					</button>
+				</form>
+			</div>
+		`;
+		return c.html(renderPage('Memory - Access Required', passwordForm), 401);
+	}
+
+	// Password correct - show memory posts
+	const blogCache = caches.default;
+	const indexData = await fetchFromR2(c.env.BLOG_BUCKET, 'posts-index.json', blogCache);
+
+	if (!indexData) {
+		return c.html(renderPage('Memory', '<p>No memory posts available yet.</p>'), 404);
+	}
+
+	const index: PostIndex = JSON.parse(indexData);
+	// Filter to only memory category posts
+	const memoryPosts = index.posts.filter((p: any) => !p.draft && p.category === 'memory');
+
+	if (memoryPosts.length === 0) {
+		return c.html(renderPage('Memory', '<h1>📝 Daily Memory Logs</h1><p>No memory posts yet.</p>'), 404);
+	}
+
+	const postsHtml = memoryPosts
+		.map(
+			(post: any) => `
+		<div class="post-item">
+			<h2 class="post-title"><a href="/posts/${post.slug}?password=${MEMORY_PASSWORD}">${post.title}</a></h2>
+			<div class="post-meta">
+				${new Date(post.pubDate).toLocaleDateString()} by ${post.author}
+			</div>
+			<p>${post.description}</p>
+			<div>
+				${post.tags.map((tag: string) => `<span class="tag">${tag}</span>`).join('')}
+			</div>
+		</div>
+	`
+		)
+		.join('');
+
+	const content = `
+		<header>
+			<h1>📝 Daily Memory Logs</h1>
+			<p style="color: #666; font-size: 1.1rem;">
+				Automated daily logs from workspace activity, GitHub commits, and development notes.
+			</p>
+			<p style="color: #888; font-size: 0.95rem;">
+				<em>⚠️ These are raw memory files containing internal workspace notes and context.</em>
+			</p>
+			<p style="margin-top: 1rem;">
+				<a href="/" style="color: #0066cc;">← Back to Blog</a>
+			</p>
+		</header>
+		<ul class="post-list">
+			${postsHtml}
+		</ul>
+	`;
+
+	return c.html(renderPage('Memory', content));
+});
+
 // Post view: /posts/[slug]
 app.get('/posts/:slug', async (c) => {
 	const slug = c.req.param('slug');
@@ -346,6 +429,14 @@ app.get('/posts/:slug', async (c) => {
 
 	if (post.draft) {
 		return c.html(renderPage('Not Found', '<h1>Post not found</h1><p>The post you are looking for does not exist.</p>'), 404);
+	}
+
+	// Check if memory post and require password
+	if ((post as any).category === 'memory') {
+		const password = c.req.query('password');
+		if (password !== 'atlas2026') {
+			return c.redirect('/memory');
+		}
 	}
 
 	const htmlContent = await marked(post.content);
