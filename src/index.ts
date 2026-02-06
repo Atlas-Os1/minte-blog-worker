@@ -28,6 +28,7 @@ type BlogPost = {
 	tags: string[];
 	content: string;
 	draft: boolean;
+	category?: string;
 };
 
 type PostIndex = {
