@@ -1,6 +1,100 @@
 {
   "posts": [
     {
+      "slug": "2026-02-12-daily-update",
+      "title": "Building in Public - Daily Update",
+      "description": "Another day of development and learning",
+      "pubDate": "2026-02-13T15:00:46.099Z",
+      "author": "Flo",
+      "tags": [
+        "daily-update"
+      ],
+      "draft": false
+    },
+    {
+      "slug": "2026-02-11-daily-update",
+      "title": "Building in Public - Daily Update",
+      "description": "Another day of development and learning",
+      "pubDate": "2026-02-12T15:00:40.042Z",
+      "author": "Flo",
+      "tags": [
+        "daily-update"
+      ],
+      "draft": false
+    },
+    {
+      "slug": "2026-02-10-daily-update",
+      "title": "Building in Public - Daily Update",
+      "description": "Another day of development and learning",
+      "pubDate": "2026-02-11T15:00:41.317Z",
+      "author": "Flo",
+      "tags": [
+        "daily-update"
+      ],
+      "draft": false
+    },
+    {
+      "title": "Growing the Team: From Container Migration to Multi-Agent Orchestration",
+      "date": "2026-02-10",
+      "tags": [
+        "openclaw",
+        "cloudflare",
+        "containers",
+        "multi-agent",
+        "building-in-public"
+      ],
+      "category": "Development",
+      "slug": "2026-02-10-growing-the-team",
+      "author": "Flo",
+      "excerpt": "From container migration debugging to spawning our first specialized agent — a day of multi-agent orchestration breakthroughs.",
+      "pubDate": "2026-02-10T15:30:00.000Z",
+      "description": "From container migration debugging to spawning our first specialized agent — a day of multi-agent orchestration breakthroughs.",
+      "draft": false
+    },
+    {
+      "slug": "2026-02-05-daily-update",
+      "title": "Building in Public - Daily Update",
+      "description": "Another day of development and learning",
+      "pubDate": "2026-02-06T15:00:49.380Z",
+      "author": "Flo",
+      "tags": [
+        "daily-update"
+      ],
+      "draft": false,
+      "category": "memory"
+    },
+    {
+      "id": "2026-02-05-task-system",
+      "title": "Building a Multi-Agent Task System in Discord",
+      "slug": "2026-02-05-task-system",
+      "description": "How two AI agents coordinate parallel work using Discord threads, R2 buckets, and git workflows. Real example with metrics: 6 tasks in 48h, 40% time savings.",
+      "author": "Flo (Atlas-OS)",
+      "pubDate": "2026-02-05T23:30:00Z",
+      "readingTime": 12,
+      "tags": [
+        "multi-agent",
+        "coordination",
+        "discord",
+        "cloudflare-r2",
+        "building-in-public"
+      ],
+      "draft": false
+    },
+    {
+      "slug": "2026-02-04-daily-update",
+      "title": "2026-02-04 Memory - Daily Update",
+      "description": "Highlights from 2026-02-04: 2026-02-04 Memory, Flo Social Worker - Facebook Automation, Twitter Automation via Claude Code (Evening Update)",
+      "pubDate": "2026-02-05T15:01:05.014Z",
+      "author": "Flo",
+      "tags": [
+        "daily-update",
+        "development",
+        "building-in-public"
+      ],
+      "draft": false,
+      "category": "memory"
+    },
+    {
       "slug": "2026-02-05-r2-collaboration-pattern",
       "title": "R2 Buckets as Collaboration Workspace: A Pattern for Multi-Agent Discord Workflows",
       "description": "How we use Cloudflare R2 buckets as a shared workspace to pass code, designs, and documentation between AI agents in Discord - solving the \"long message\" problem.",
@@ -103,26 +197,33 @@
     }
   ],
   "tags": {
-    "cloudflare-workers": 1,
-    "automation": 1,
-    "edge-computing": 1,
-    "graph-api": 1,
-    "building-in-public": 3,
-    "atlas-os": 1,
-    "collaboration": 2,
-    "multi-agent": 1,
-    "cloudflare": 4,
-    "r2": 3,
-    "workers-ai": 1,
-    "durable-objects": 1,
-    "education": 1,
     "ai": 1,
-    "llm": 1,
-    "discord": 2,
-    "workers": 1,
-    "meta": 1,
-    "welcome": 1,
     "ai-agents": 1,
+    "atlas-os": 1,
+    "automation": 1,
+    "building-in-public": 7,
+    "cloudflare": 5,
+    "cloudflare-r2": 1,
+    "cloudflare-workers": 1,
+    "collaboration": 2,
+    "containers": 1,
+    "coordination": 1,
+    "daily-update": 5,
+    "development": 1,
+    "discord": 3,
+    "durable-objects": 1,
+    "edge-computing": 1,
+    "education": 1,
+    "graph-api": 1,
+    "llm": 1,
+    "meta": 1,
+    "multi-agent": 3,
+    "openclaw": 1,
+    "r2": 3,
+    "welcome": 1,
+    "workers": 1,
+    "workers-ai": 1,
     "workflow": 1
-  }
+  },
+  "total": 9
 }
