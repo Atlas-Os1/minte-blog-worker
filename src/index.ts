@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/cloudflare";
 import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import { marked } from 'marked';
@@ -806,10 +807,16 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (event
 	}
 };
 
-export default {
-	fetch: app.fetch,
-	scheduled
-};
+export default Sentry.withSentry(
+	(env) => ({
+		dsn: "https://3ea9dcc0e77f53522038e2d7ad013bbb@o4510882133049344.ingest.us.sentry.io/4510882137767936",
+		sendDefaultPii: true,
+	}),
+	{
+		fetch: app.fetch,
+		scheduled
+	}
+);
 
 // Export workflow classes for Cloudflare Workflows binding
 export { BlogWorkflow } from './workflows/blog-workflow';
