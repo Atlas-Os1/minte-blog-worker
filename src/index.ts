@@ -449,7 +449,9 @@ app.get('/posts/:slug', async (c) => {
 		}
 	}
 
-	const htmlContent = await marked(post.content);
+	// Strip first H1 from content (already rendered in header)
+	const contentWithoutH1 = post.content.replace(/^#\s+.+\n+/, '');
+	const htmlContent = await marked(contentWithoutH1);
 	
 	// Fetch related posts (same tags)
 	const indexData = await fetchFromR2(c.env.BLOG_BUCKET, 'posts-index.json', blogCache);
