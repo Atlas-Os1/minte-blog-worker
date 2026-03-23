@@ -11,7 +11,43 @@ type Bindings = {
 	CF_ZONE_ID: string;
 	CLOUDFLARE_API_TOKEN: string;
 	GITHUB_TOKEN: string;
+	ADMIN_TOKEN?: string; // Bearer token for admin endpoints
 };
+
+// Rate limiting helper using Cache API
+async function checkRateLimit(
+	ip: string,
+	endpoint: string,
+	maxRequests: number = 5,
+	windowSeconds: number = 60
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+	const cache = caches.default;
+	const key = new Request(`https://ratelimit/${endpoint}/${ip}`);
+	
+	const now = Math.floor(Date.now() / 1000);
+	const windowStart = now - (now % windowSeconds);
+	const resetAt = windowStart + windowSeconds;
+	
+	const cached = await cache.match(key);
+	let count = 0;
+	
+	if (cached) {
+		const data = await cached.json() as { count: number; window: number };
+		if (data.window === windowStart) {
+			count = data.count;
+		}
+	}
+	
+	count++;
+	const allowed = count <= maxRequests;
+	
+	// Store updated count
+	await cache.put(key, new Response(JSON.stringify({ count, window: windowStart }), {
+		headers: { 'Cache-Control': `max-age=${windowSeconds}` }
+	}));
+	
+	return { allowed, remaining: Math.max(0, maxRequests - count), resetAt };
+}
 
 // Scheduled handler type
 type ExportedHandlerScheduledHandler<Env = unknown> = (
@@ -702,15 +738,24 @@ app.get('/assets/*', async (c) => {
 	});
 });
 
-// Admin endpoint: Purge cache (requires auth header)
+// Admin endpoint: Purge cache (requires auth header + rate limited)
 app.post('/admin/purge-cache', async (c) => {
-	const authHeader = c.req.header('Authorization');
+	// Rate limiting: 5 requests per minute per IP
+	const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+	const rateLimit = await checkRateLimit(ip, 'admin-purge', 5, 60);
 	
-	// Simple bearer token auth (set PURGE_TOKEN secret in worker)
-	// For now, we'll skip auth for testing - add in production!
-	// if (!authHeader || authHeader !== `Bearer ${c.env.PURGE_TOKEN}`) {
-	// 	return c.json({ error: 'Unauthorized' }, 401);
-	// }
+	if (!rateLimit.allowed) {
+		return c.json({ 
+			error: 'Rate limit exceeded',
+			retryAfter: rateLimit.resetAt - Math.floor(Date.now() / 1000)
+		}, 429);
+	}
+
+	// Bearer token auth
+	const authHeader = c.req.header('Authorization');
+	if (!c.env.ADMIN_TOKEN || !authHeader || authHeader !== `Bearer ${c.env.ADMIN_TOKEN}`) {
+		return c.json({ error: 'Unauthorized' }, 401);
+	}
 
 	try {
 		const blogCache = caches.default;
@@ -738,8 +783,25 @@ app.post('/admin/purge-cache', async (c) => {
 	}
 });
 
-// Admin endpoint: Trigger blog generation manually (simplified version)
+// Admin endpoint: Trigger blog generation manually (requires auth + rate limited)
 app.post('/admin/generate-blog', async (c) => {
+	// Rate limiting: 3 requests per 5 minutes per IP (blog gen is expensive)
+	const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+	const rateLimit = await checkRateLimit(ip, 'admin-generate', 3, 300);
+	
+	if (!rateLimit.allowed) {
+		return c.json({ 
+			error: 'Rate limit exceeded',
+			retryAfter: rateLimit.resetAt - Math.floor(Date.now() / 1000)
+		}, 429);
+	}
+
+	// Bearer token auth
+	const authHeader = c.req.header('Authorization');
+	if (!c.env.ADMIN_TOKEN || !authHeader || authHeader !== `Bearer ${c.env.ADMIN_TOKEN}`) {
+		return c.json({ error: 'Unauthorized' }, 401);
+	}
+
 	try {
 		// Generate blog post
 		const post = await generateBlogPost(c.env.BLOG_BUCKET);
