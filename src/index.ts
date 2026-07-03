@@ -369,9 +369,12 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 			padding: 12px 14px; border: 1px solid var(--border); border-radius: 999px;
 			background: var(--bg-secondary); backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(15,23,42,.08);
 		}
-		.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.03em; }
-		.brand-mark { display: grid; place-items: center; width: clamp(64px, 9vw, 86px); height: clamp(64px, 9vw, 86px); border-radius: 50%; background: white; box-shadow: 0 12px 30px rgba(255, 107, 53, .18); overflow: hidden; flex: 0 0 auto; }
+		.brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; font-weight: 800; letter-spacing: -0.03em; }
+		.brand-mark { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: white; box-shadow: 0 10px 24px rgba(255, 107, 53, .16); overflow: hidden; flex: 0 0 auto; }
 		.brand-mark img { width: 100%; height: 100%; display: block; object-fit: cover; border-radius: 50%; }
+		.brand-copy { display: grid; gap: 1px; line-height: .95; }
+		.brand-name { font-size: clamp(1.05rem, 2.3vw, 1.35rem); color: var(--accent); letter-spacing: -0.04em; }
+		.brand-subtitle { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); }
 		.nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
 		.nav a:not(.brand) { padding: 8px 12px; color: var(--text-secondary); border-radius: 999px; font-size: .92rem; }
 		.nav a:hover { background: var(--muted); color: var(--text-primary); }
@@ -480,7 +483,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 	<button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" aria-label="Toggle theme">🌙</button>
 	<div class="container">
 		<nav class="nav" aria-label="Primary navigation">
-			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark"><img src="${MINTE_FAVICON_URL}" alt="Minte.dev" width="86" height="86"></span><span>Build Log</span></a>
+			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark"><img src="${MINTE_FAVICON_URL}" alt="" width="42" height="42"></span><span class="brand-copy"><span class="brand-name">Minte.dev</span><span class="brand-subtitle">Build Log</span></span></a>
 			<div class="nav-links">
 				<a href="/#projects">Projects</a>
 				<a href="/#posts">Posts</a>
