@@ -44,7 +44,7 @@ export async function generateHeroImage(
     }
 
     // Response is a ReadableStream of image bytes
-    const imageBuffer = response as ArrayBuffer;
+    const imageBuffer = response as unknown as ArrayBuffer;
     
     // Upload to R2
     const imageKey = `images/hero-${Date.now()}.png`;

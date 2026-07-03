@@ -90,4 +90,5 @@ export interface BlogWorkflowEnv {
   CLOUDFLARE_API_TOKEN: string;
   GITHUB_TOKEN: string;
   AI: Ai;
+  DEV_MODE?: string;
 }

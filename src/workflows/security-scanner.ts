@@ -116,15 +116,16 @@ export function scanAndRedact(content: string): SecurityScanResult {
     // Reset pattern state
     pattern.lastIndex = 0;
     
-    let match;
+    let match: RegExpExecArray | null;
     while ((match = pattern.exec(content)) !== null) {
-      const matchedText = match[0];
+      const currentMatch = match;
+      const matchedText = currentMatch[0];
       
       // Check for false positives
       const isFalsePositive = FALSE_POSITIVE_CONTEXTS.some(fp => {
         // Check surrounding context (50 chars before and after)
-        const start = Math.max(0, match.index - 50);
-        const end = Math.min(content.length, match.index + matchedText.length + 50);
+        const start = Math.max(0, currentMatch.index - 50);
+        const end = Math.min(content.length, currentMatch.index + matchedText.length + 50);
         const context = content.slice(start, end);
         return fp.test(context);
       });
@@ -136,7 +137,7 @@ export function scanAndRedact(content: string): SecurityScanResult {
       let lineNum = 1;
       for (const line of lines) {
         charCount += line.length + 1; // +1 for newline
-        if (charCount > match.index) break;
+        if (charCount > currentMatch.index) break;
         lineNum++;
       }
 
