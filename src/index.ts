@@ -73,6 +73,160 @@ type PostIndex = {
 	tags: Record<string, number>;
 };
 
+
+type ProjectLink = {
+	slug: string;
+	name: string;
+	description: string;
+	site?: string;
+	repo: string;
+	accent: string;
+	tags: string[];
+};
+
+const PROJECTS: ProjectLink[] = [
+	{
+		slug: 'handy-beaver',
+		name: 'Handy Beaver',
+		description: 'Field-service platform for handyman operations, invoices, leads, and AI-assisted workflows.',
+		site: 'https://handybeaver.co/',
+		repo: 'https://github.com/Atlas-Os1/handy-beaver',
+		accent: '#ff8a3d',
+		tags: ['handy-beaver', 'handybeaver', 'lil-beaver', 'invoice', 'payments'],
+	},
+	{
+		slug: 'kiamichi-biz-connect',
+		name: 'Kiamichi Biz Connect',
+		description: 'Local business directory, enrichment, content automation, and Cloudflare-native publishing.',
+		site: 'https://kiamichibizconnect.com/',
+		repo: 'https://github.com/mintedmaterial/kiamichi-Biz-Connect',
+		accent: '#33d6a6',
+		tags: ['kiamichi-biz-connect', 'kiamichi', 'kbc', 'local-business'],
+	},
+	{
+		slug: 'minte-blog-worker',
+		name: 'Minte Blog Worker',
+		description: 'The edge-published build log powered by Cloudflare Workers, R2, Workflows, and automation.',
+		site: 'https://blog.minte.dev/',
+		repo: 'https://github.com/Atlas-Os1/minte-blog-worker',
+		accent: '#8b5cf6',
+		tags: ['blog', 'minte-blog-worker', 'publishing', 'building-in-public'],
+	},
+	{
+		slug: 'openclaw-memory',
+		name: 'OpenClaw Memory',
+		description: 'Shared agent memory layer using Cloudflare Vectorize, R2, Workers AI, and retrieval APIs.',
+		repo: 'https://github.com/Atlas-Os1/openclaw-memory-vectorize',
+		accent: '#38bdf8',
+		tags: ['openclaw', 'memory', 'vectorize', 'r2'],
+	},
+	{
+		slug: 'openmontage',
+		name: 'OpenMontage',
+		description: 'Creative/media project lane for visual systems and public build experiments.',
+		repo: 'https://github.com/Atlas-Os1/OpenMontage',
+		accent: '#f472b6',
+		tags: ['openmontage', 'creative', 'media'],
+	},
+	{
+		slug: 'flo-social-worker',
+		name: 'Flo Social Worker',
+		description: 'Social publishing automation and queueing for project updates and business content.',
+		repo: 'https://github.com/Atlas-Os1/flo-social-worker',
+		accent: '#facc15',
+		tags: ['flo-social-worker', 'social', 'facebook', 'automation'],
+	},
+];
+
+function escapeHtml(value: string): string {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
+function normalize(value: string): string {
+	return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function inferProject(post: Omit<BlogPost, 'content'> | BlogPost): ProjectLink {
+	const haystack = [post.title, post.description, ...post.tags, post.author].join(' ').toLowerCase();
+	return PROJECTS.find((project) => project.tags.some((tag) => haystack.includes(tag))) || PROJECTS[2];
+}
+
+function estimateReadingTime(content?: string, fallback?: unknown): string {
+	if (typeof fallback === 'string' && fallback.trim()) return fallback;
+	if (!content) return '3 min read';
+	const words = content.replace(/```[\s\S]*?```/g, '').split(/\s+/).filter(Boolean).length;
+	return `${Math.max(1, Math.ceil(words / 220))} min read`;
+}
+
+function stripLeadingH1(content: string, title: string): string {
+	return content.replace(/^#\s+.+?(?:\r?\n){1,2}/, '').replace(new RegExp(`^#\\s+${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:\\r?\\n){1,2}`, 'i'), '');
+}
+
+function buildTableOfContents(markdown: string): string {
+	const headings = Array.from(markdown.matchAll(/^(##|###)\s+(.+)$/gm)).slice(0, 12);
+	if (headings.length < 3) return '';
+	return `
+		<aside class="toc-card" aria-label="Table of contents">
+			<p class="eyebrow">On this page</p>
+			${headings.map((match) => {
+				const depth = match[1].length;
+				const label = match[2].replace(/[#*_`]/g, '').trim();
+				const id = normalize(label);
+				return `<a class="toc-link depth-${depth}" href="#${id}">${escapeHtml(label)}</a>`;
+			}).join('')}
+		</aside>`;
+}
+
+function addHeadingIds(html: string): string {
+	return html.replace(/<h([23])>(.*?)<\/h\1>/g, (_match, level: string, text: string) => {
+		const label = text.replace(/<[^>]+>/g, '').trim();
+		return `<h${level} id="${normalize(label)}">${text}</h${level}>`;
+	});
+}
+
+function renderTags(tags: string[]): string {
+	return tags.map((tag) => `<a href="/tags/${encodeURIComponent(tag)}" class="tag" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</a>`).join('');
+}
+
+function renderProjectCard(project: ProjectLink, compact = false): string {
+	return `
+		<article class="project-card${compact ? ' compact' : ''}" style="--project-accent: ${project.accent}">
+			<div>
+				<p class="eyebrow">Project</p>
+				<h3>${project.name}</h3>
+				<p>${project.description}</p>
+			</div>
+			<div class="project-actions">
+				${project.site ? `<a href="${project.site}" target="_blank" rel="noopener">Site</a>` : ''}
+				<a href="${project.repo}" target="_blank" rel="noopener">GitHub</a>
+			</div>
+		</article>`;
+}
+
+function renderPostCard(post: Omit<BlogPost, 'content'>): string {
+	const project = inferProject(post);
+	const readingTime = estimateReadingTime(undefined, (post as any).readingTime);
+	const searchable = escapeHtml([post.title, post.description, post.author, ...post.tags, project.name].join(' ').toLowerCase());
+	return `
+		<article class="post-card" data-search="${searchable}" data-project="${project.slug}" style="--project-accent: ${project.accent}" onclick="if (!event.target.closest('a')) location.href='/posts/${post.slug}'">
+			<div class="post-card-topline">
+				<a class="project-pill" href="${project.site || project.repo}" target="_blank" rel="noopener">${project.name}</a>
+				<span>${new Date(post.pubDate).toLocaleDateString()} · ${escapeHtml(readingTime)}</span>
+			</div>
+			<h2 class="post-title"><a href="/posts/${post.slug}">${escapeHtml(post.title)}</a></h2>
+			<p>${escapeHtml(post.description)}</p>
+			<div class="post-card-footer">
+				<div class="tag-row">${renderTags(post.tags.slice(0, 6))}</div>
+				<a class="read-more" href="/posts/${post.slug}" aria-label="Read ${escapeHtml(post.title)}">Read build note →</a>
+			</div>
+		</article>`;
+}
+
 const app = new Hono<{ Bindings: Bindings }>();
 
 // CORS for API endpoints
@@ -126,160 +280,239 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 	<style>
 		:root {
-			--bg-primary: #f5f5f5;
-			--bg-secondary: white;
-			--text-primary: #333;
-			--text-secondary: #666;
+			--bg-primary: oklch(0.985 0.012 83);
+			--bg-secondary: rgba(255, 255, 255, 0.86);
+			--surface: rgba(255, 255, 255, 0.72);
+			--surface-strong: #ffffff;
+			--text-primary: oklch(0.18 0.024 260);
+			--text-secondary: oklch(0.44 0.035 260);
+			--muted: oklch(0.93 0.018 250);
 			--accent: #FF6B35;
-			--border: #eee;
-			--code-bg: #1e1e1e;
-			--tag-bg: #e8f4f8;
-			--tag-text: #0066cc;
+			--accent-2: #16c7a8;
+			--border: rgba(20, 28, 45, 0.12);
+			--code-bg: #101827;
+			--tag-bg: rgba(22, 199, 168, 0.12);
+			--tag-text: #076b5c;
+			--shadow: 0 22px 70px rgba(15, 23, 42, 0.12);
+			--radius: 24px;
 		}
-		
 		[data-theme="dark"] {
-			--bg-primary: #1a1a1a;
-			--bg-secondary: #2a2a2a;
-			--text-primary: #e0e0e0;
-			--text-secondary: #aaa;
-			--accent: #FF6B35;
-			--border: #444;
-			--code-bg: #0d0d0d;
-			--tag-bg: #2a3a4a;
-			--tag-text: #4a9eff;
+			--bg-primary: #080d16;
+			--bg-secondary: rgba(14, 22, 36, 0.88);
+			--surface: rgba(19, 29, 47, 0.72);
+			--surface-strong: #111827;
+			--text-primary: #eef4ff;
+			--text-secondary: #a8b3c7;
+			--muted: rgba(255,255,255,0.08);
+			--border: rgba(255,255,255,0.12);
+			--tag-bg: rgba(74, 222, 190, 0.14);
+			--tag-text: #70f0d5;
+			--code-bg: #020617;
+			--shadow: 0 22px 80px rgba(0, 0, 0, 0.38);
 		}
-		
 		* { margin: 0; padding: 0; box-sizing: border-box; }
-		body { 
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-			line-height: 1.6;
+		html { scroll-behavior: smooth; }
+		body {
+			font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+			line-height: 1.7;
 			color: var(--text-primary);
-			background: var(--bg-primary);
-			padding: 20px;
+			background:
+				radial-gradient(circle at top left, rgba(255,107,53,.22), transparent 34rem),
+				radial-gradient(circle at top right, rgba(22,199,168,.2), transparent 28rem),
+				var(--bg-primary);
+			min-height: 100vh;
 			transition: background 0.3s, color 0.3s;
 		}
-		.container { 
-			max-width: 800px; 
-			margin: 0 auto; 
-			background: var(--bg-secondary);
-			padding: 40px;
-			border-radius: 8px;
-			box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+		a { color: inherit; text-decoration: none; }
+		a:hover { color: var(--accent); }
+		img { max-width: 100%; height: auto; border-radius: 18px; }
+		.container { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+		.nav {
+			position: sticky; top: 12px; z-index: 50; margin-bottom: 36px;
+			display: flex; align-items: center; justify-content: space-between; gap: 16px;
+			padding: 12px 14px; border: 1px solid var(--border); border-radius: 999px;
+			background: var(--bg-secondary); backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(15,23,42,.08);
 		}
-		header { margin-bottom: 40px; }
-		h1 { font-size: 2.5rem; margin-bottom: 10px; color: var(--text-primary); }
-		h2 { font-size: 2rem; margin: 30px 0 15px; color: var(--text-primary); }
-		h3 { font-size: 1.5rem; margin: 25px 0 10px; color: var(--text-primary); }
-		a { color: var(--tag-text); text-decoration: none; }
-		a:hover { text-decoration: underline; }
-		.post-meta { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px; }
-		.tag { 
-			background: var(--tag-bg);
-			color: var(--tag-text);
-			padding: 4px 12px;
-			border-radius: 4px;
-			font-size: 0.85rem;
-			margin-right: 8px;
-			display: inline-block;
-		}
+		.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.03em; }
+		.brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: white; }
+		.nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+		.nav a:not(.brand) { padding: 8px 12px; color: var(--text-secondary); border-radius: 999px; font-size: .92rem; }
+		.nav a:hover { background: var(--muted); color: var(--text-primary); }
 		.theme-toggle {
-			position: fixed;
-			top: 20px;
-			right: 20px;
-			background: var(--accent);
-			color: white;
-			border: none;
-			padding: 10px 16px;
-			border-radius: 20px;
-			cursor: pointer;
-			font-size: 1.2rem;
-			box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-			transition: transform 0.2s;
-			z-index: 1000;
+			position: fixed; right: 22px; bottom: 22px; z-index: 1000; width: 48px; height: 48px;
+			border: 1px solid var(--border); border-radius: 50%; cursor: pointer; font-size: 1.2rem;
+			background: var(--surface-strong); color: var(--text-primary); box-shadow: var(--shadow); transition: transform .2s ease;
 		}
-		.theme-toggle:hover {
-			transform: scale(1.1);
-		}
-		.post-list { list-style: none; }
-		.post-item { 
-			margin-bottom: 30px;
-			padding-bottom: 30px;
-			border-bottom: 1px solid var(--border);
-		}
-		.post-item:last-child { border-bottom: none; }
-		.post-title { font-size: 1.5rem; margin-bottom: 8px; }
-		.nav { margin-bottom: 30px; }
-		.nav a { margin-right: 20px; }
-		img { max-width: 100%; height: auto; border-radius: 4px; }
-		pre { 
-			background: var(--code-bg);
-			padding: 16px;
-			border-radius: 6px;
-			overflow-x: auto;
-			margin: 20px 0;
-		}
-		code { 
-			font-family: 'Courier New', monospace;
-			font-size: 0.9rem;
-			color: var(--text-primary);
-		}
-		p { margin: 15px 0; }
-		ul, ol { margin: 15px 0 15px 30px; }
-		blockquote {
-			border-left: 4px solid var(--accent);
-			padding-left: 20px;
-			margin: 20px 0;
-			color: var(--text-secondary);
-			font-style: italic;
-		}
+		.theme-toggle:hover { transform: translateY(-3px) rotate(8deg); }
+		.hero { position: relative; overflow: hidden; padding: clamp(34px, 6vw, 72px); border-radius: 36px; background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(255,255,255,.62)); border: 1px solid var(--border); box-shadow: var(--shadow); }
+		[data-theme="dark"] .hero { background: linear-gradient(135deg, rgba(17,24,39,.94), rgba(17,24,39,.62)); }
+		.hero-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 30px; align-items: center; }
+		.eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .13em; font-size: .78rem; font-weight: 800; }
+		h1 { font-size: clamp(2.45rem, 7vw, 5.6rem); line-height: .92; letter-spacing: -0.075em; margin: 14px 0 18px; }
+		h2 { font-size: clamp(1.55rem, 3vw, 2.35rem); line-height: 1.05; letter-spacing: -0.045em; margin: 0 0 16px; }
+		h3 { font-size: 1.15rem; line-height: 1.2; margin: 0 0 8px; }
+		.lede { font-size: clamp(1.05rem, 2vw, 1.26rem); color: var(--text-secondary); max-width: 68ch; }
+		.hero-actions, .project-actions, .post-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+		.btn, .project-actions a, .share-link { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 10px 15px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-strong); font-weight: 700; }
+		.btn.primary { background: linear-gradient(135deg, var(--accent), #fb923c); color: white; border-color: transparent; }
+		.btn:hover, .project-actions a:hover, .share-link:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(15,23,42,.12); }
+		.hero-panel { display: grid; gap: 12px; padding: 20px; border: 1px solid var(--border); border-radius: 24px; background: var(--surface); }
+		.metric { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+		.metric:last-child { border-bottom: 0; }
+		.section { margin-top: 44px; }
+		.section-heading { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 18px; }
+		.section-heading p { color: var(--text-secondary); max-width: 65ch; }
+		.project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+		.project-card { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-height: 220px; padding: 22px; border: 1px solid var(--border); border-radius: 24px; background: var(--surface); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+		.project-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 4px; background: var(--project-accent); }
+		.project-card:hover { transform: translateY(-5px); border-color: var(--project-accent); box-shadow: 0 18px 50px rgba(15,23,42,.12); }
+		.project-card p { color: var(--text-secondary); }
+		.project-card.compact { min-height: auto; }
+		.controls { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 18px; }
+		.search-box { width: 100%; min-height: 48px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-strong); color: var(--text-primary); padding: 0 16px; font: inherit; }
+		.filter-row { display: flex; flex-wrap: wrap; gap: 8px; }
+		.filter-chip { border: 1px solid var(--border); background: var(--surface-strong); color: var(--text-secondary); border-radius: 999px; padding: 9px 12px; cursor: pointer; font-weight: 700; }
+		.filter-chip.active, .filter-chip:hover { color: white; background: var(--accent); border-color: var(--accent); }
+		.post-list { list-style: none; display: grid; gap: 18px; }
+		.post-card { cursor: pointer; position: relative; padding: clamp(20px, 4vw, 30px); border: 1px solid var(--border); border-radius: 28px; background: var(--surface); box-shadow: 0 10px 30px rgba(15,23,42,.06); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+		.post-card:hover { transform: translateY(-4px); border-color: var(--project-accent); box-shadow: 0 22px 60px rgba(15,23,42,.12); }
+		.post-card-topline, .post-card-footer, .article-meta, .pager { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+		.post-card-topline, .article-meta { color: var(--text-secondary); font-size: .93rem; margin-bottom: 12px; }
+		.project-pill { display: inline-flex; padding: 5px 10px; border-radius: 999px; background: color-mix(in srgb, var(--project-accent), transparent 82%); color: var(--project-accent); font-weight: 800; }
+		.post-title { margin-bottom: 10px; }
+		.post-title a:hover { color: var(--project-accent); }
+		.post-card p { color: var(--text-secondary); max-width: 78ch; }
+		.tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+		.tag { display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; background: var(--tag-bg); color: var(--tag-text); font-size: .84rem; font-weight: 750; }
+		.tag:hover { color: white; background: var(--accent); }
+		.read-more { color: var(--project-accent); font-weight: 800; white-space: nowrap; }
+		.no-results { display: none; padding: 24px; border: 1px dashed var(--border); border-radius: 20px; color: var(--text-secondary); text-align: center; }
+		.progress { position: fixed; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transform-origin: left; transform: scaleX(0); z-index: 2000; }
+		.article-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 30px; align-items: start; }
+		.article-shell { padding: clamp(24px, 5vw, 52px); border: 1px solid var(--border); border-radius: 32px; background: var(--surface); box-shadow: var(--shadow); }
+		.article-shell h1 { font-size: clamp(2.15rem, 5vw, 4.2rem); }
+		.article-description { color: var(--text-secondary); font-size: 1.12rem; margin: 16px 0; }
+		.post-content { font-size: 1.06rem; }
+		.post-content h2, .post-content h3 { scroll-margin-top: 96px; margin-top: 2.1em; }
+		.post-content p { margin: 1.05em 0; }
+		.post-content a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+		.post-content ul, .post-content ol { margin: 1em 0 1em 1.4em; }
+		.post-content blockquote { border-left: 4px solid var(--accent); padding: 14px 0 14px 18px; margin: 24px 0; color: var(--text-secondary); background: var(--muted); border-radius: 0 16px 16px 0; }
+		pre { background: var(--code-bg); padding: 18px; border-radius: 18px; overflow-x: auto; margin: 22px 0; }
+		code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace; font-size: .92rem; }
+		.toc-stack { position: sticky; top: 96px; display: grid; gap: 16px; }
+		.toc-card { padding: 18px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); }
+		.toc-link { display: block; color: var(--text-secondary); padding: 7px 0; font-size: .92rem; }
+		.toc-link.depth-3 { padding-left: 12px; font-size: .86rem; }
+		.toc-link:hover { color: var(--accent); }
+		.related-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 16px; }
+		.related-card { display: block; padding: 16px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface-strong); }
+		.related-card p { color: var(--text-secondary); font-size: .92rem; }
+		.pager { margin-top: 34px; padding-top: 24px; border-top: 1px solid var(--border); }
+		.footer { margin-top: 56px; padding: 32px; border: 1px solid var(--border); border-radius: 28px; background: var(--surface); }
+		.footer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; }
+		.footer a { display: block; color: var(--text-secondary); margin: 7px 0; }
+		.footer a:hover { color: var(--accent); }
+		@media (max-width: 900px) { .hero-grid, .article-layout, .footer-grid { grid-template-columns: 1fr; } .toc-stack { position: static; } .controls { grid-template-columns: 1fr; } }
+		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { align-items: flex-start; border-radius: 22px; flex-direction: column; } .hero, .article-shell { border-radius: 24px; } .section-heading { align-items: start; flex-direction: column; } }
 	</style>
 </head>
 <body>
-	<button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle">🌙</button>
+	<div class="progress" id="reading-progress" aria-hidden="true"></div>
+	<button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" aria-label="Toggle theme">🌙</button>
 	<div class="container">
-		<nav class="nav">
-			<a href="/">Home</a>
-			<a href="/api/posts">API</a>
-			<a href="/rss.xml">RSS</a>
-			<a href="/sitemap.xml">Sitemap</a>
+		<nav class="nav" aria-label="Primary navigation">
+			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark">M</span><span>Minte Build Log</span></a>
+			<div class="nav-links">
+				<a href="/#projects">Projects</a>
+				<a href="/#posts">Posts</a>
+				<a href="https://handybeaver.co/" target="_blank" rel="noopener">Handy Beaver</a>
+				<a href="https://kiamichibizconnect.com/" target="_blank" rel="noopener">KBC</a>
+				<a href="https://github.com/Atlas-Os1" target="_blank" rel="noopener">GitHub</a>
+				<a href="/rss.xml">RSS</a>
+			</div>
 		</nav>
-		${content}
-		<footer style="margin-top: 60px; padding-top: 40px; border-top: 2px solid var(--border); text-align: center;">
-			<div style="margin-bottom: 20px;">
-				<h3 style="margin-bottom: 15px; color: var(--text-primary);">Connect with Atlas-OS</h3>
-				<div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; font-size: 1.2rem;">
-					<a href="https://twitter.com/AtlasOS_AI" target="_blank" rel="noopener" style="color: var(--tag-text);" title="Twitter/X">𝕏 @AtlasOS_AI</a>
-					<a href="https://moltbook.com/u/FloMinte" target="_blank" rel="noopener" style="color: var(--tag-text);" title="Moltbook">🦞 FloMinte</a>
-					<a href="https://github.com/Atlas-Os1" target="_blank" rel="noopener" style="color: var(--tag-text);" title="GitHub">💻 GitHub</a>
+		<main>
+			${content}
+		</main>
+		<footer class="footer">
+			<div class="footer-grid">
+				<div>
+					<p class="eyebrow">Atlas / Minte</p>
+					<h3>Building public, useful systems.</h3>
+					<p style="color: var(--text-secondary); margin-top: 10px;">Cloudflare Workers, AI agents, local business platforms, and automation infrastructure.</p>
+				</div>
+				<div>
+					<h3>Sites</h3>
+					<a href="https://handybeaver.co/" target="_blank" rel="noopener">HandyBeaver.co</a>
+					<a href="https://kiamichibizconnect.com/" target="_blank" rel="noopener">KiamichiBizConnect.com</a>
+					<a href="https://blog.minte.dev/">Minte Blog</a>
+				</div>
+				<div>
+					<h3>Repos & Socials</h3>
+					<a href="https://github.com/Atlas-Os1" target="_blank" rel="noopener">GitHub: Atlas-Os1</a>
+					<a href="https://github.com/mintedmaterial" target="_blank" rel="noopener">GitHub: mintedmaterial</a>
+					<a href="https://twitter.com/AtlasOS_AI" target="_blank" rel="noopener">𝕏 @AtlasOS_AI</a>
+					<a href="https://moltbook.com/u/FloMinte" target="_blank" rel="noopener">Moltbook: FloMinte</a>
 				</div>
 			</div>
-			<div style="color: var(--text-secondary); font-size: 0.9rem;">
-				<p style="margin-bottom: 8px;">Built with Cloudflare Workers, R2, and AI</p>
-				<p>© ${new Date().getFullYear()} Atlas-OS · Building in Public</p>
-			</div>
+			<p style="color: var(--text-secondary); font-size: .9rem; margin-top: 24px;">© ${new Date().getFullYear()} Atlas-OS · Built with Cloudflare Workers, R2, and AI.</p>
 		</footer>
 	</div>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-	<script>hljs.highlightAll();</script>
+	<script>if (window.hljs) hljs.highlightAll();</script>
 	<script>
-		// Theme toggle functionality
 		function toggleTheme() {
 			const html = document.documentElement;
 			const currentTheme = html.getAttribute('data-theme');
 			const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
 			const btn = document.getElementById('theme-toggle');
-			
 			html.setAttribute('data-theme', newTheme);
 			localStorage.setItem('theme', newTheme);
 			btn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
 		}
-		
-		// Load saved theme
 		(function() {
-			const savedTheme = localStorage.getItem('theme') || 'light';
+			const savedTheme = localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 			const btn = document.getElementById('theme-toggle');
 			document.documentElement.setAttribute('data-theme', savedTheme);
 			btn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+		})();
+		(function() {
+			const progress = document.getElementById('reading-progress');
+			function updateProgress() {
+				const max = document.documentElement.scrollHeight - innerHeight;
+				const ratio = max > 0 ? Math.min(1, scrollY / max) : 0;
+				progress.style.transform = 'scaleX(' + ratio + ')';
+			}
+			addEventListener('scroll', updateProgress, { passive: true });
+			updateProgress();
+		})();
+		(function() {
+			const search = document.querySelector('[data-post-search]');
+			const cards = Array.from(document.querySelectorAll('[data-search]'));
+			const chips = Array.from(document.querySelectorAll('[data-project-filter]'));
+			const empty = document.querySelector('[data-no-results]');
+			let activeProject = 'all';
+			function applyFilters() {
+				const query = search ? search.value.trim().toLowerCase() : '';
+				let shown = 0;
+				cards.forEach(function(card) {
+					const matchesQuery = !query || card.dataset.search.includes(query);
+					const matchesProject = activeProject === 'all' || card.dataset.project === activeProject;
+					const visible = matchesQuery && matchesProject;
+					card.style.display = visible ? '' : 'none';
+					if (visible) shown += 1;
+				});
+				if (empty) empty.style.display = shown ? 'none' : 'block';
+			}
+			if (search) search.addEventListener('input', applyFilters);
+			chips.forEach(function(chip) {
+				chip.addEventListener('click', function() {
+					activeProject = chip.dataset.projectFilter || 'all';
+					chips.forEach(function(c) { c.classList.toggle('active', c === chip); });
+					applyFilters();
+				});
+			});
 		})();
 	</script>
 </body>
@@ -333,45 +566,79 @@ app.get('/', async (c) => {
 	const indexData = await fetchFromR2(c.env.BLOG_BUCKET, 'posts-index.json', blogCache);
 
 	if (!indexData) {
-		return c.html(renderPage('Blog', '<p>No posts available yet.</p>'), 404);
+		const emptyContent = `
+			<section class="hero">
+				<p class="eyebrow">Atlas / Minte Build Log</p>
+				<h1>Building in Public</h1>
+				<p class="lede">No posts are available yet, but the publishing worker is online.</p>
+			</section>`;
+		return c.html(renderPage('Blog', emptyContent), 404);
 	}
 
 	const index: PostIndex = JSON.parse(indexData);
 	const publishedPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory');
-
-	const postsHtml = publishedPosts
-		.map(
-			(post) => `
-		<div class="post-item">
-			<h2 class="post-title"><a href="/posts/${post.slug}">${post.title}</a></h2>
-			<div class="post-meta">
-				${new Date(post.pubDate).toLocaleDateString()} by ${post.author}
-			</div>
-			<p>${post.description}</p>
-			<div>
-				${post.tags.map((tag) => `<span class="tag">${tag}</span>`).join('')}
-			</div>
-		</div>
-	`
-		)
+	const featuredProjects = PROJECTS.slice(0, 6).map((project) => renderProjectCard(project)).join('');
+	const postsHtml = publishedPosts.map(renderPostCard).join('');
+	const topTags = Object.entries(index.tags)
+		.sort((a, b) => b[1] - a[1])
+		.slice(0, 10)
+		.map(([tag]) => `<a class="tag" href="/tags/${encodeURIComponent(tag)}">#${escapeHtml(tag)}</a>`)
 		.join('');
 
 	const content = `
-		<header>
-			<h1>Building in Public</h1>
-			<p style="color: #666; font-size: 1.1rem;">Daily updates from Flo's development journey</p>
-			<div style="margin-top: 1.5rem;">
-				<a href="/memory" 
-					style="display: inline-block; padding: 0.75rem 1.5rem; background: #1a1a1a; color: #fff; border: 1px solid #333; border-radius: 6px; text-decoration: none; font-weight: 500; transition: all 0.2s;"
-					onmouseover="this.style.background='#2a2a2a'; this.style.borderColor='#555';"
-					onmouseout="this.style.background='#1a1a1a'; this.style.borderColor='#333';">
-					🔒 View Memory Logs
-				</a>
+		<section class="hero">
+			<div class="hero-grid">
+				<div>
+					<p class="eyebrow">Cloudflare · AI agents · local business systems</p>
+					<h1>Building the Atlas / Minte stack in public.</h1>
+					<p class="lede">A living build log for the repos, Workers, agents, and local-business platforms behind Handy Beaver, Kiamichi Biz Connect, OpenClaw memory, and the Minte publishing system.</p>
+					<div class="hero-actions">
+						<a class="btn primary" href="#posts">Read latest posts →</a>
+						<a class="btn" href="#projects">Explore projects</a>
+						<a class="btn" href="https://github.com/Atlas-Os1" target="_blank" rel="noopener">GitHub</a>
+					</div>
+				</div>
+				<div class="hero-panel" aria-label="Blog stats">
+					<div class="metric"><span>Published posts</span><strong>${publishedPosts.length}</strong></div>
+					<div class="metric"><span>Top tag</span><strong>${escapeHtml(Object.entries(index.tags).sort((a, b) => b[1] - a[1])[0]?.[0] || 'building-in-public')}</strong></div>
+					<div class="metric"><span>Runtime</span><strong>Cloudflare Workers</strong></div>
+					<div class="metric"><span>Storage</span><strong>R2 + Workflows</strong></div>
+					<div class="tag-row">${topTags}</div>
+				</div>
 			</div>
-		</header>
-		<ul class="post-list">
-			${postsHtml}
-		</ul>
+		</section>
+
+		<section class="section" id="projects">
+			<div class="section-heading">
+				<div>
+					<p class="eyebrow">Project ecosystem</p>
+					<h2>Every post should point back to what we are shipping.</h2>
+				</div>
+				<p>These cards make the blog work as a portfolio and navigation hub, not just a dated archive.</p>
+			</div>
+			<div class="project-grid">${featuredProjects}</div>
+		</section>
+
+		<section class="section" id="posts">
+			<div class="section-heading">
+				<div>
+					<p class="eyebrow">Latest build notes</p>
+					<h2>Browse the work by repo, project, or tag.</h2>
+				</div>
+				<p>Search titles, tags, project names, authors, and descriptions. Hover a card and click anywhere to open the post.</p>
+			</div>
+			<div class="controls">
+				<input class="search-box" data-post-search type="search" placeholder="Search posts, projects, tags..." aria-label="Search posts">
+				<div class="filter-row" aria-label="Project filters">
+					<button class="filter-chip active" type="button" data-project-filter="all">All</button>
+					${PROJECTS.slice(0, 5).map((project) => `<button class="filter-chip" type="button" data-project-filter="${project.slug}">${project.name}</button>`).join('')}
+				</div>
+			</div>
+			<ul class="post-list">
+				${postsHtml}
+			</ul>
+			<div class="no-results" data-no-results>No posts match that search yet.</div>
+		</section>
 	`;
 
 	return c.html(renderPage('Home', content));
@@ -468,13 +735,13 @@ app.get('/posts/:slug', async (c) => {
 	const postData = await fetchFromR2(c.env.BLOG_BUCKET, `posts/${slug}.json`, blogCache);
 
 	if (!postData) {
-		return c.html(renderPage('Not Found', '<h1>Post not found</h1><p>The post you are looking for does not exist.</p>'), 404);
+		return c.html(renderPage('Not Found', '<section class="article-shell"><h1>Post not found</h1><p>The post you are looking for does not exist.</p></section>'), 404);
 	}
 
 	const post: BlogPost = JSON.parse(postData);
 
 	if (post.draft) {
-		return c.html(renderPage('Not Found', '<h1>Post not found</h1><p>The post you are looking for does not exist.</p>'), 404);
+		return c.html(renderPage('Not Found', '<section class="article-shell"><h1>Post not found</h1><p>The post you are looking for does not exist.</p></section>'), 404);
 	}
 
 	// Check if memory post and require password
@@ -485,54 +752,78 @@ app.get('/posts/:slug', async (c) => {
 		}
 	}
 
-	// Strip first H1 from content (already rendered in header)
-	const contentWithoutH1 = post.content.replace(/^#\s+.+\n+/, '');
-	const htmlContent = await marked(contentWithoutH1);
+	const contentWithoutH1 = stripLeadingH1(post.content, post.title);
+	const htmlContent = addHeadingIds(await marked(contentWithoutH1));
+	const toc = buildTableOfContents(contentWithoutH1);
+	const project = inferProject(post);
+	const readingTime = estimateReadingTime(post.content, (post as any).readingTime);
 	
-	// Fetch related posts (same tags)
+	// Fetch related posts, neighboring posts, and same-project context
 	const indexData = await fetchFromR2(c.env.BLOG_BUCKET, 'posts-index.json', blogCache);
 	let relatedPosts: Array<Omit<BlogPost, 'content'>> = [];
+	let previousPost: Omit<BlogPost, 'content'> | undefined;
+	let nextPost: Omit<BlogPost, 'content'> | undefined;
 	if (indexData) {
 		const index: PostIndex = JSON.parse(indexData);
-		relatedPosts = index.posts
-			.filter((p) => !p.draft && p.slug !== slug && p.tags.some(tag => post.tags.includes(tag)))
+		const publishedPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory');
+		const postIndex = publishedPosts.findIndex((p) => p.slug === slug);
+		nextPost = postIndex > 0 ? publishedPosts[postIndex - 1] : undefined;
+		previousPost = postIndex >= 0 && postIndex < publishedPosts.length - 1 ? publishedPosts[postIndex + 1] : undefined;
+		relatedPosts = publishedPosts
+			.filter((p) => p.slug !== slug && (p.tags.some(tag => post.tags.includes(tag)) || inferProject(p).slug === project.slug))
 			.slice(0, 3);
 	}
 
+	const shareUrl = `https://blog.minte.dev/posts/${post.slug}`;
+	const relatedHtml = relatedPosts.length > 0 ? `
+		<section class="section">
+			<p class="eyebrow">Keep reading</p>
+			<h2>Related build notes</h2>
+			<div class="related-grid">
+				${relatedPosts.map((p) => `
+					<a class="related-card" href="/posts/${p.slug}">
+						<strong>${escapeHtml(p.title)}</strong>
+						<p>${escapeHtml(p.description)}</p>
+					</a>`).join('')}
+			</div>
+		</section>` : '';
+
 	const content = `
-		<article>
-			${(post as any).heroImage ? `
-			<div style="margin-bottom: 30px;">
-				<img src="${(post as any).heroImage}" alt="${post.title}" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-			</div>
-			` : ''}
-			<header>
-				<h1>${post.title}</h1>
-				<div class="post-meta">
-					${new Date(post.pubDate).toLocaleDateString()} by ${post.author}
+		<div class="article-layout">
+			<article class="article-shell" style="--project-accent: ${project.accent}">
+				${(post as any).heroImage ? `
+				<div style="margin-bottom: 28px;">
+					<img src="${(post as any).heroImage}" alt="${escapeHtml(post.title)}" style="width: 100%; box-shadow: 0 16px 50px rgba(0,0,0,0.14);">
+				</div>` : ''}
+				<header>
+					<p class="eyebrow">${project.name} · ${readingTime}</p>
+					<h1>${escapeHtml(post.title)}</h1>
+					<p class="article-description">${escapeHtml(post.description)}</p>
+					<div class="article-meta">
+						<span>${new Date(post.pubDate).toLocaleDateString()} by ${escapeHtml(post.author)}</span>
+						<a class="project-pill" href="${project.site || project.repo}" target="_blank" rel="noopener">${project.name}</a>
+					</div>
+					<div class="tag-row">${renderTags(post.tags)}</div>
+					<div class="post-actions">
+						<a class="share-link" href="https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(post.title)}" target="_blank" rel="noopener">Share on X</a>
+						<a class="share-link" href="mailto:?subject=${encodeURIComponent(post.title)}&body=${encodeURIComponent(shareUrl)}">Email</a>
+						<a class="share-link" href="${project.repo}" target="_blank" rel="noopener">Project repo</a>
+					</div>
+				</header>
+				<div class="post-content">
+					${htmlContent}
 				</div>
-				<div style="margin-bottom: 20px;">
-					${post.tags.map((tag) => `<a href="/tags/${tag}" class="tag">${tag}</a>`).join('')}
-				</div>
-			</header>
-			<div class="post-content">
-				${htmlContent}
-			</div>
-			${relatedPosts.length > 0 ? `
-			<div style="margin-top: 60px; padding-top: 40px; border-top: 2px solid var(--border);">
-				<h3 style="margin-bottom: 20px;">Related Posts</h3>
-				<div style="display: grid; gap: 20px;">
-					${relatedPosts.map(p => `
-						<div style="padding: 15px; border: 1px solid var(--border); border-radius: 8px;">
-							<h4 style="margin-bottom: 8px;"><a href="/posts/${p.slug}">${p.title}</a></h4>
-							<p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 8px;">${p.description}</p>
-							<div class="post-meta">${new Date(p.pubDate).toLocaleDateString()}</div>
-						</div>
-					`).join('')}
-				</div>
-			</div>
-			` : ''}
-		</article>
+				${relatedHtml}
+				<nav class="pager" aria-label="Post navigation">
+					${previousPost ? `<a class="btn" href="/posts/${previousPost.slug}">← ${escapeHtml(previousPost.title)}</a>` : '<span></span>'}
+					${nextPost ? `<a class="btn" href="/posts/${nextPost.slug}">${escapeHtml(nextPost.title)} →</a>` : '<span></span>'}
+				</nav>
+			</article>
+			<aside class="toc-stack">
+				${toc}
+				${renderProjectCard(project, true)}
+			</aside>
+		</div>
 	`;
 
 	return c.html(renderPage(post.title, content, generateMetaTags(post)));
@@ -546,38 +837,35 @@ app.get('/tags/:tag', async (c) => {
 	const indexData = await fetchFromR2(c.env.BLOG_BUCKET, 'posts-index.json', blogCache);
 
 	if (!indexData) {
-		return c.html(renderPage('Tag Not Found', '<p>No posts available.</p>'), 404);
+		return c.html(renderPage('Tag Not Found', '<section class="article-shell"><p>No posts available.</p></section>'), 404);
 	}
 
 	const index: PostIndex = JSON.parse(indexData);
-	const filteredPosts = index.posts.filter((p) => !p.draft && p.tags.includes(tag));
+	const filteredPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory' && p.tags.includes(tag));
 
 	if (filteredPosts.length === 0) {
-		return c.html(renderPage(`Tag: ${tag}`, `<h1>Tag: ${tag}</h1><p>No posts found with this tag.</p>`), 404);
+		return c.html(renderPage(`Tag: ${tag}`, `<section class="article-shell"><h1>Tag: ${escapeHtml(tag)}</h1><p>No posts found with this tag.</p></section>`), 404);
 	}
 
-	const postsHtml = filteredPosts
-		.map(
-			(post) => `
-		<div class="post-item">
-			<h2 class="post-title"><a href="/posts/${post.slug}">${post.title}</a></h2>
-			<div class="post-meta">
-				${new Date(post.pubDate).toLocaleDateString()} by ${post.author}
-			</div>
-			<p>${post.description}</p>
-		</div>
-	`
-		)
-		.join('');
+	const postsHtml = filteredPosts.map(renderPostCard).join('');
 
 	const content = `
-		<header>
-			<h1>Tag: ${tag}</h1>
-			<p style="color: #666;">Showing ${filteredPosts.length} post(s)</p>
-		</header>
-		<ul class="post-list">
-			${postsHtml}
-		</ul>
+		<section class="hero">
+			<p class="eyebrow">Tag archive</p>
+			<h1>#${escapeHtml(tag)}</h1>
+			<p class="lede">Showing ${filteredPosts.length} build note(s) connected to this topic.</p>
+		</section>
+		<section class="section" id="posts">
+			<div class="controls">
+				<input class="search-box" data-post-search type="search" placeholder="Search this tag archive..." aria-label="Search posts tagged ${escapeHtml(tag)}">
+				<div class="filter-row">
+					<button class="filter-chip active" type="button" data-project-filter="all">All projects</button>
+					${PROJECTS.slice(0, 5).map((project) => `<button class="filter-chip" type="button" data-project-filter="${project.slug}">${project.name}</button>`).join('')}
+				</div>
+			</div>
+			<ul class="post-list">${postsHtml}</ul>
+			<div class="no-results" data-no-results>No posts match that search yet.</div>
+		</section>
 	`;
 
 	return c.html(renderPage(`Tag: ${tag}`, content));
@@ -877,8 +1165,8 @@ export default Sentry.withSentry(
 		sendDefaultPii: true,
 	}),
 	{
-		fetch: app.fetch,
-		scheduled
+		fetch: app.fetch as any,
+		scheduled: scheduled as any
 	}
 );
 

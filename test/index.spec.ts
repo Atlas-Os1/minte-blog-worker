@@ -2,23 +2,28 @@ import { env, createExecutionContext, waitOnExecutionContext, SELF } from 'cloud
 import { describe, it, expect } from 'vitest';
 import worker from '../src/index';
 
-// For now, you'll need to do something like this to get a correctly-typed
-// `Request` to pass to `worker.fetch()`.
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
-describe('Hello World worker', () => {
-	it('responds with Hello World! (unit style)', async () => {
-		const request = new IncomingRequest('http://example.com');
-		// Create an empty context to pass to `worker.fetch()`.
+describe('Minte Blog worker', () => {
+	it('renders the modern blog shell when no posts are available in the test bucket', async () => {
+		const request = new IncomingRequest('http://example.com/');
 		const ctx = createExecutionContext();
 		const response = await worker.fetch(request, env, ctx);
-		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
 		await waitOnExecutionContext(ctx);
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
+
+		const html = await response.text();
+		expect(response.status).toBe(404);
+		expect(html).toContain('Minte Build Log');
+		expect(html).toContain('Building in Public');
+		expect(html).toContain('HandyBeaver.co');
+		expect(html).toContain('KiamichiBizConnect.com');
 	});
 
-	it('responds with Hello World! (integration style)', async () => {
-		const response = await SELF.fetch('https://example.com');
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
+	it('returns JSON errors from the posts API when no index is available', async () => {
+		const response = await SELF.fetch('https://example.com/api/posts');
+		const body = await response.json() as { error: string };
+
+		expect(response.status).toBe(404);
+		expect(body.error).toBe('No posts available');
 	});
 });

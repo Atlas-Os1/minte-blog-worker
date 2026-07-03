@@ -1,7 +1,5 @@
 // manual-blog-gen.ts - Manual blog generation (simplified, no Workflows API)
 
-import type { R2Bucket } from '@cloudflare/workers-types';
-
 export interface SimpleBlogPost {
   slug: string;
   title: string;
@@ -11,6 +9,8 @@ export interface SimpleBlogPost {
   tags: string[];
   content: string;
   draft: boolean;
+  project?: string;
+  readingTime?: string;
 }
 
 export interface PostIndex {
@@ -35,7 +35,7 @@ async function parseMemoryFile(bucket: R2Bucket, date: string): Promise<MemoryHi
     return {
       date,
       content: content.slice(0, 1000), // First 1000 chars for context
-      headers: headers.map(h => h.replace(/^##? /, ''))
+      headers: headers.map((h: string) => h.replace(/^##? /, ''))
     };
   } catch (error) {
     console.error(`Failed to parse memory for ${date}:`, error);
@@ -55,6 +55,41 @@ async function fetchGitHubActivity(bucket: R2Bucket, date: string): Promise<stri
   }
 }
 
+function inferTagsFromText(text: string): string[] {
+  const lower = text.toLowerCase();
+  const tagMap: Array<[string, string[]]> = [
+    ['handy-beaver', ['handy', 'beaver', 'invoice', 'payment']],
+    ['kiamichi-biz-connect', ['kiamichi', 'kbc', 'business directory']],
+    ['minte-blog-worker', ['blog', 'publishing', 'post', 'rss']],
+    ['openclaw', ['openclaw', 'memory', 'vectorize']],
+    ['cloudflare', ['cloudflare', 'worker', 'r2', 'd1', 'workflow']],
+    ['ai-agents', ['agent', 'hermes', 'cleo', 'lil beaver', 'devflo']],
+  ];
+  const tags = tagMap.filter(([, needles]) => needles.some((needle) => lower.includes(needle))).map(([tag]) => tag);
+  return Array.from(new Set(tags)).slice(0, 5);
+}
+
+function inferProjectFromText(text: string): string {
+  const tags = inferTagsFromText(text);
+  return tags.find((tag) => ['handy-beaver', 'kiamichi-biz-connect', 'minte-blog-worker', 'openclaw'].includes(tag)) || 'atlas-os';
+}
+
+function estimateReadingTime(content: string): string {
+  const words = content.replace(/```[\s\S]*?```/g, '').split(/\s+/).filter(Boolean).length;
+  return `${Math.max(1, Math.ceil(words / 220))} min read`;
+}
+
+function summarizeGitHubActivity(activity: string): string {
+  const lower = activity.toLowerCase();
+  if (!activity.trim()) return '';
+  if (lower.includes('handy')) return 'Handy Beaver repo activity';
+  if (lower.includes('kiamichi') || lower.includes('kbc')) return 'Kiamichi Biz Connect updates';
+  if (lower.includes('blog')) return 'Minte Blog Worker publishing updates';
+  if (lower.includes('memory') || lower.includes('openclaw')) return 'OpenClaw memory infrastructure updates';
+  if (lower.includes('cloudflare') || lower.includes('worker')) return 'Cloudflare Worker infrastructure updates';
+  return 'Atlas / Minte repo activity';
+}
+
 export async function generateBlogPost(bucket: R2Bucket, githubToken?: string): Promise<SimpleBlogPost> {
   const today = new Date();
   const yesterday = new Date(today);
@@ -67,17 +102,19 @@ export async function generateBlogPost(bucket: R2Bucket, githubToken?: string): 
   // Fetch GitHub activity
   const githubActivity = await fetchGitHubActivity(bucket, dateStr);
   
-  // Determine content based on what we have
-  let title = `Daily Update - ${dateStr}`;
-  let description = 'Daily development update from Flo';
+  // Determine content based on what we have. Prefer specific, SEO-useful build-log headlines
+  // over generic daily-update copy so the public blog consistently points back to repos/projects.
+  let title = `Atlas / Minte Build Log - ${dateStr}`;
+  let description = 'A focused build log from the Atlas / Minte project ecosystem.';
   let content = '';
-  let tags = ['daily-update', 'development'];
+  let tags = ['daily-update', 'development', 'building-in-public'];
   
   if (memory && memory.headers.length > 0) {
     // Build blog from memory
-    title = `${memory.headers[0]} - Daily Update`;
-    description = `Highlights from ${dateStr}: ${memory.headers.slice(0, 3).join(', ')}`;
-    tags = ['daily-update', 'development', 'building-in-public'];
+    const primaryTopic = memory.headers[0].replace(/^(daily update|building in public)[: -]*/i, '').trim() || 'Atlas / Minte project work';
+    title = `${primaryTopic}: ${dateStr} Build Log`;
+    description = `Project notes from ${dateStr}: ${memory.headers.slice(0, 3).join(', ')}`;
+    tags = ['daily-update', 'development', 'building-in-public', ...inferTagsFromText(`${memory.content} ${githubActivity}`)];
     
     content = `# ${title}
 
@@ -99,15 +136,18 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
 
 ![Flo's Signature](https://blog.minte.dev/assets/branding/author-signature-flo.svg)`;
   } else {
-    // Fallback: simple update
-    title = 'Building in Public - Daily Update';
-    description = 'Another day of development and learning';
-    tags = ['daily-update'];
-    content = `# Building in Public
+    // Fallback: simple update that still reads like a specific build log
+    const activitySummary = summarizeGitHubActivity(githubActivity);
+    title = activitySummary ? `${activitySummary}: ${dateStr} Build Log` : `Atlas / Minte Systems Check - ${dateStr}`;
+    description = activitySummary
+      ? `Daily build note covering ${activitySummary.toLowerCase()} across the Atlas / Minte repos.`
+      : `Daily build note for the Atlas / Minte project ecosystem on ${dateStr}.`;
+    tags = ['daily-update', 'building-in-public', ...inferTagsFromText(githubActivity)];
+    content = `# ${title}
 
 No major activities logged for ${dateStr}.
 
-Continuing development work across various projects.
+Continuing development work across Handy Beaver, Kiamichi Biz Connect, Minte Blog Worker, OpenClaw memory, and related Cloudflare repos.
 
 ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` : ''}
 
@@ -132,7 +172,9 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
     author: 'Flo',
     tags,
     content,
-    draft: false
+    draft: false,
+    project: inferProjectFromText(`${title} ${description} ${tags.join(' ')}`),
+    readingTime: estimateReadingTime(content)
     // heroImage: 'https://pub-748cd0b5fd7d4d38a0c3ad5c09d205ae.r2.dev/skills/art_bucket/daily-update-${dateStr}.png'
   };
 
