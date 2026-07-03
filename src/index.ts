@@ -84,6 +84,8 @@ type ProjectLink = {
 	tags: string[];
 };
 
+const MINTE_FAVICON_URL = 'https://pub-0be86ba29d2f4e66b59fe97deb2ea9d3.r2.dev/assets/favicon.png';
+
 const PROJECTS: ProjectLink[] = [
 	{
 		slug: 'handy-beaver',
@@ -288,7 +290,9 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>${title} - Minte Blog</title>
-	<link rel="icon" type="image/png" href="https://pub-0be86ba29d2f4e66b59fe97deb2ea9d3.r2.dev/assets/favicon.png">
+	<link rel="icon" type="image/png" href="${MINTE_FAVICON_URL}">
+	<link rel="shortcut icon" type="image/png" href="${MINTE_FAVICON_URL}">
+	<link rel="apple-touch-icon" href="${MINTE_FAVICON_URL}">
 	${metaTags}
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 	<style>
@@ -347,7 +351,8 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 			background: var(--bg-secondary); backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(15,23,42,.08);
 		}
 		.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.03em; }
-		.brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: white; }
+		.brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: white; box-shadow: 0 10px 24px rgba(255, 107, 53, .16); overflow: hidden; flex: 0 0 auto; }
+		.brand-mark img { width: 100%; height: 100%; display: block; object-fit: cover; border-radius: 50%; }
 		.nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
 		.nav a:not(.brand) { padding: 8px 12px; color: var(--text-secondary); border-radius: 999px; font-size: .92rem; }
 		.nav a:hover { background: var(--muted); color: var(--text-primary); }
@@ -456,7 +461,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 	<button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" aria-label="Toggle theme">🌙</button>
 	<div class="container">
 		<nav class="nav" aria-label="Primary navigation">
-			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark">M</span><span>Minte Build Log</span></a>
+			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark"><img src="${MINTE_FAVICON_URL}" alt="" width="40" height="40"></span><span>Minte Build Log</span></a>
 			<div class="nav-links">
 				<a href="/#projects">Projects</a>
 				<a href="/#posts">Posts</a>
