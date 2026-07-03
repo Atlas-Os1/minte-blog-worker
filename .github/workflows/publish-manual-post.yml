@@ -147,10 +147,71 @@ jobs:
           SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
           curl --fail-with-body -sS \
             -X POST \
-            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
             "https://blog.minte.dev/admin/purge-cache?slug=${SLUG}"
         env:
           POST_FILE: ${{ inputs.post_file }}
+
+      - name: Verify live post asset URLs
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const https = require('https');
+          const postPath = process.env.POST_FILE;
+          const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+          const base = 'https://blog.minte.dev';
+          const refs = new Set();
+          if (post.heroImage && post.heroImage.startsWith('/assets/posts/')) refs.add(post.heroImage);
+          const content = String(post.content || '');
+          for (const match of content.matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
+            if (match[1].startsWith('/assets/posts/')) refs.add(match[1]);
+          }
+          for (const match of content.matchAll(/\((\/assets\/posts\/[^\s\)"']+)\)/g)) refs.add(match[1]);
+          if (process.env.ASSETS_DIR && refs.size === 0) {
+            throw new Error('assets_dir was provided but post references no /assets/posts/ URLs');
+          }
+          function fetchOnce(url) {
+            return new Promise((resolve, reject) => {
+              const req = https.get(url, { headers: { 'User-Agent': 'minte-blog-publish-verifier' }, timeout: 15000 }, (res) => {
+                let bytes = 0;
+                res.on('data', (chunk) => { bytes += chunk.length; });
+                res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', bytes }));
+              });
+              req.on('timeout', () => req.destroy(new Error('timeout')));
+              req.on('error', reject);
+            });
+          }
+          async function fetchWithRetry(url) {
+            let last;
+            for (let attempt = 1; attempt <= 6; attempt++) {
+              try {
+                const result = await fetchOnce(url);
+                if (result.status === 200 && result.bytes > 0) return result;
+                last = new Error(`status=${result.status} bytes=${result.bytes} type=${result.type}`);
+              } catch (error) {
+                last = error;
+              }
+              await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
+            }
+            throw last;
+          }
+          (async () => {
+            const postUrl = `${base}/posts/${post.slug}`;
+            const postResult = await fetchWithRetry(postUrl);
+            console.log(`Verified post ${postUrl}: ${postResult.status} ${postResult.type} ${postResult.bytes} bytes`);
+            for (const ref of refs) {
+              const url = `${base}${ref}`;
+              const result = await fetchWithRetry(url);
+              console.log(`Verified asset ${url}: ${result.status} ${result.type} ${result.bytes} bytes`);
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+          ASSETS_DIR: ${{ inputs.assets_dir }}
 
       - name: Summary
         run: |

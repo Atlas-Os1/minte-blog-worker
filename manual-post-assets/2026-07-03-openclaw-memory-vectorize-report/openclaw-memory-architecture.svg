@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" fill="none">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#020617"/><stop offset="100%" stop-color="#0f172a"/></linearGradient>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker>
+</defs>
+<rect width="1600" height="1000" fill="url(#bg)"/>
+<g opacity="0.20"><path d="M0 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M40 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M80 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M120 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M160 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M200 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M240 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M280 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M320 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M360 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M400 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M440 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M480 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M520 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M560 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M600 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M640 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M680 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M720 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M760 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M800 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M840 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M880 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M920 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M960 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1000 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1040 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1080 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1120 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1160 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1200 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1240 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1280 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1320 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1360 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1400 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1440 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1480 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1520 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1560 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M1600 0V1000" stroke="#1e293b" stroke-width="1"/><path d="M0 0H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 40H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 80H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 120H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 160H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 200H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 240H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 280H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 320H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 360H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 400H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 440H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 480H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 520H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 560H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 600H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 640H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 680H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 720H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 760H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 800H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 840H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 880H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 920H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 960H1600" stroke="#1e293b" stroke-width="1"/><path d="M0 1000H1600" stroke="#1e293b" stroke-width="1"/></g>
+<text x="70" y="80" fill="#f8fafc" font-size="34" font-family="JetBrains Mono,monospace" font-weight="700">OpenClaw Memory Vectorize Architecture</text>
+<text x="70" y="116" fill="#94a3b8" font-size="17" font-family="JetBrains Mono,monospace">Cloudflare-native retrieval memory for OpenClaw and Hermes agents</text>
+
+<g stroke="#fb7185" stroke-dasharray="8 6"><rect x="60" y="150" width="1480" height="760" rx="20" fill="none"/><text x="84" y="182" fill="#fb7185" font-size="14" font-family="JetBrains Mono,monospace">CLOUDFLARE EDGE BOUNDARY</text></g>
+
+<g>
+  <rect x="110" y="260" width="280" height="140" rx="18" fill="rgba(8,51,68,0.40)" stroke="#22d3ee" stroke-width="2"/>
+  <text x="140" y="308" fill="#ecfeff" font-size="28" font-family="JetBrains Mono,monospace" font-weight="700">OpenClaw</text>
+  <text x="140" y="338" fill="#9bdaf0" font-size="15" font-family="JetBrains Mono,monospace">plugin lifecycle hooks</text>
+  <text x="140" y="366" fill="#9bdaf0" font-size="15" font-family="JetBrains Mono,monospace">auto-recall / auto-capture</text>
+
+  <rect x="110" y="500" width="280" height="140" rx="18" fill="rgba(8,51,68,0.40)" stroke="#22d3ee" stroke-width="2"/>
+  <text x="140" y="548" fill="#ecfeff" font-size="28" font-family="JetBrains Mono,monospace" font-weight="700">Hermes</text>
+  <text x="140" y="578" fill="#9bdaf0" font-size="15" font-family="JetBrains Mono,monospace">MemoryProvider + tools</text>
+  <text x="140" y="606" fill="#9bdaf0" font-size="15" font-family="JetBrains Mono,monospace">prefetch + sync_turn</text>
+
+  <rect x="520" y="380" width="340" height="180" rx="18" fill="rgba(6,78,59,0.40)" stroke="#34d399" stroke-width="2"/>
+  <text x="555" y="434" fill="#ecfdf5" font-size="30" font-family="JetBrains Mono,monospace" font-weight="700">Memory Worker</text>
+  <text x="555" y="468" fill="#a7f3d0" font-size="15" font-family="JetBrains Mono,monospace">/query  /index  /capture</text>
+  <text x="555" y="496" fill="#a7f3d0" font-size="15" font-family="JetBrains Mono,monospace">/index-file  /stats  /health</text>
+  <text x="555" y="524" fill="#a7f3d0" font-size="15" font-family="JetBrains Mono,monospace">TypeScript worker on Cloudflare</text>
+
+  <rect x="1040" y="240" width="360" height="140" rx="18" fill="rgba(76,29,149,0.40)" stroke="#a78bfa" stroke-width="2"/>
+  <text x="1075" y="292" fill="#f5f3ff" font-size="28" font-family="JetBrains Mono,monospace" font-weight="700">Vectorize Index</text>
+  <text x="1075" y="324" fill="#ddd6fe" font-size="15" font-family="JetBrains Mono,monospace">768-dim cosine similarity</text>
+  <text x="1075" y="352" fill="#ddd6fe" font-size="15" font-family="JetBrains Mono,monospace">metadata filters by agent + type</text>
+
+  <rect x="1040" y="430" width="360" height="140" rx="18" fill="rgba(120,53,15,0.30)" stroke="#fbbf24" stroke-width="2"/>
+  <text x="1075" y="482" fill="#fffbeb" font-size="28" font-family="JetBrains Mono,monospace" font-weight="700">Workers AI</text>
+  <text x="1075" y="514" fill="#fde68a" font-size="15" font-family="JetBrains Mono,monospace">bge-base-en-v1.5 embeddings</text>
+  <text x="1075" y="542" fill="#fde68a" font-size="15" font-family="JetBrains Mono,monospace">semantic query + chunk encoding</text>
+
+  <rect x="1040" y="620" width="360" height="140" rx="18" fill="rgba(30,41,59,0.55)" stroke="#94a3b8" stroke-width="2"/>
+  <text x="1075" y="672" fill="#f8fafc" font-size="28" font-family="JetBrains Mono,monospace" font-weight="700">R2 Buckets</text>
+  <text x="1075" y="704" fill="#cbd5e1" font-size="15" font-family="JetBrains Mono,monospace">memory files + attached source docs</text>
+  <text x="1075" y="732" fill="#cbd5e1" font-size="15" font-family="JetBrains Mono,monospace">file indexing path</text>
+</g>
+
+<g stroke="#94a3b8" stroke-width="3" marker-end="url(#arrow)">
+  <path d="M390 330H520"/>
+  <path d="M390 570H520"/>
+  <path d="M860 430C930 390 960 340 1040 320"/>
+  <path d="M860 470H1040"/>
+  <path d="M860 520C930 570 960 640 1040 690"/>
+</g>
+<g fill="#94a3b8" font-size="14" font-family="JetBrains Mono,monospace">
+  <text x="426" y="320">query / capture</text>
+  <text x="430" y="560">search / remember</text>
+  <text x="910" y="360">vector read/write</text>
+  <text x="930" y="460">embedding calls</text>
+  <text x="920" y="650">file source ingest</text>
+</g>
+</svg>
