@@ -195,11 +195,15 @@ function renderTags(tags: string[]): string {
 
 function renderProjectCard(project: ProjectLink, compact = false): string {
 	return `
-		<article class="project-card${compact ? ' compact' : ''}" style="--project-accent: ${project.accent}">
+		<article class="project-card reveal-card${compact ? ' compact' : ''}" data-reveal-card style="--project-accent: ${project.accent}">
+			<div class="card-ambient" aria-hidden="true"></div>
 			<div>
 				<p class="eyebrow">Project</p>
 				<h3>${project.name}</h3>
 				<p>${project.description}</p>
+			</div>
+			<div class="card-preview" aria-hidden="true">
+				<span></span><span></span><span></span>
 			</div>
 			<div class="project-actions">
 				${project.site ? `<a href="${project.site}" target="_blank" rel="noopener">Site</a>` : ''}
@@ -212,14 +216,23 @@ function renderPostCard(post: Omit<BlogPost, 'content'>): string {
 	const project = inferProject(post);
 	const readingTime = estimateReadingTime(undefined, (post as any).readingTime);
 	const searchable = escapeHtml([post.title, post.description, post.author, ...post.tags, project.name].join(' ').toLowerCase());
+	const titleWords = post.title.split(/\s+/).slice(0, 4);
 	return `
-		<article class="post-card" data-search="${searchable}" data-project="${project.slug}" style="--project-accent: ${project.accent}" onclick="if (!event.target.closest('a')) location.href='/posts/${post.slug}'">
+		<article class="post-card reveal-card" data-reveal-card data-search="${searchable}" data-project="${project.slug}" style="--project-accent: ${project.accent}" onclick="if (!event.target.closest('a')) location.href='/posts/${post.slug}'">
+			<div class="card-ambient" aria-hidden="true"></div>
 			<div class="post-card-topline">
 				<a class="project-pill" href="${project.site || project.repo}" target="_blank" rel="noopener">${project.name}</a>
 				<span>${new Date(post.pubDate).toLocaleDateString()} · ${escapeHtml(readingTime)}</span>
 			</div>
 			<h2 class="post-title"><a href="/posts/${post.slug}">${escapeHtml(post.title)}</a></h2>
 			<p>${escapeHtml(post.description)}</p>
+			<div class="card-preview" aria-hidden="true">
+				${titleWords.map((word) => `<span>${escapeHtml(word)}</span>`).join('')}
+			</div>
+			<div class="post-card-popout">
+				<strong>Open the build note</strong>
+				<span>Project: ${project.name} · ${escapeHtml(post.tags.slice(0, 3).join(' / ') || 'building in public')}</span>
+			</div>
 			<div class="post-card-footer">
 				<div class="tag-row">${renderTags(post.tags.slice(0, 6))}</div>
 				<a class="read-more" href="/posts/${post.slug}" aria-label="Read ${escapeHtml(post.title)}">Read build note →</a>
@@ -326,7 +339,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		a { color: inherit; text-decoration: none; }
 		a:hover { color: var(--accent); }
 		img { max-width: 100%; height: auto; border-radius: 18px; }
-		.container { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+		.container { width: min(1180px, calc(100% - 32px)); max-width: 100%; margin: 0 auto; padding: 24px 0 56px; overflow-x: clip; }
 		.nav {
 			position: sticky; top: 12px; z-index: 50; margin-bottom: 36px;
 			display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -335,7 +348,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		}
 		.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.03em; }
 		.brand-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: white; }
-		.nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+		.nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
 		.nav a:not(.brand) { padding: 8px 12px; color: var(--text-secondary); border-radius: 999px; font-size: .92rem; }
 		.nav a:hover { background: var(--muted); color: var(--text-primary); }
 		.theme-toggle {
@@ -346,7 +359,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.theme-toggle:hover { transform: translateY(-3px) rotate(8deg); }
 		.hero { position: relative; overflow: hidden; padding: clamp(34px, 6vw, 72px); border-radius: 36px; background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(255,255,255,.62)); border: 1px solid var(--border); box-shadow: var(--shadow); }
 		[data-theme="dark"] .hero { background: linear-gradient(135deg, rgba(17,24,39,.94), rgba(17,24,39,.62)); }
-		.hero-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 30px; align-items: center; }
+		.hero-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); gap: 30px; align-items: center; }
 		.eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .13em; font-size: .78rem; font-weight: 800; }
 		h1 { font-size: clamp(2.45rem, 7vw, 5.6rem); line-height: .92; letter-spacing: -0.075em; margin: 14px 0 18px; }
 		h2 { font-size: clamp(1.55rem, 3vw, 2.35rem); line-height: 1.05; letter-spacing: -0.045em; margin: 0 0 16px; }
@@ -386,6 +399,27 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.tag { display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; background: var(--tag-bg); color: var(--tag-text); font-size: .84rem; font-weight: 750; }
 		.tag:hover { color: white; background: var(--accent); }
 		.read-more { color: var(--project-accent); font-weight: 800; white-space: nowrap; }
+
+		.reveal-card { isolation: isolate; transform-style: preserve-3d; will-change: transform; }
+		.card-ambient { position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0; z-index: -1; background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--project-accent), transparent 48%), transparent 42%); transition: opacity .35s ease; }
+		.reveal-card::after { content: ''; position: absolute; inset: 1px; border-radius: inherit; pointer-events: none; opacity: 0; background: linear-gradient(135deg, color-mix(in srgb, var(--project-accent), transparent 84%), transparent 38%, rgba(255,255,255,.10)); transition: opacity .35s ease; }
+		.reveal-card.is-inview { animation: card-breathe 2.4s ease-in-out infinite; }
+		.reveal-card.is-active, .reveal-card:hover, .reveal-card:focus-within { transform: perspective(1000px) translateY(-9px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.018); border-color: color-mix(in srgb, var(--project-accent), white 10%); box-shadow: 0 28px 90px color-mix(in srgb, var(--project-accent), transparent 76%), 0 18px 60px rgba(15,23,42,.18); }
+		.reveal-card.is-active .card-ambient, .reveal-card:hover .card-ambient, .reveal-card.is-active::after, .reveal-card:hover::after { opacity: 1; }
+		.card-preview { display: grid; grid-template-columns: repeat(4, minmax(44px, 1fr)); gap: 8px; max-height: 0; opacity: 0; transform: translateY(10px); overflow: hidden; transition: max-height .45s cubic-bezier(.2,.8,.2,1), opacity .3s ease, transform .35s ease; }
+		.card-preview span { min-height: 42px; display: grid; place-items: center; border-radius: 14px; color: color-mix(in srgb, var(--project-accent), white 18%); background: linear-gradient(135deg, color-mix(in srgb, var(--project-accent), transparent 72%), rgba(255,255,255,.08)); border: 1px solid color-mix(in srgb, var(--project-accent), transparent 70%); font-size: .72rem; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
+		.reveal-card.is-active .card-preview, .reveal-card:hover .card-preview { max-height: 84px; opacity: 1; transform: translateY(0); margin: 18px 0 0; }
+		.post-card-popout { display: grid; gap: 4px; max-height: 0; opacity: 0; overflow: hidden; transform: translateY(8px); transition: max-height .45s cubic-bezier(.2,.8,.2,1), opacity .3s ease, transform .35s ease; color: var(--text-secondary); }
+		.post-card-popout strong { color: var(--text-primary); }
+		.reveal-card.is-active .post-card-popout, .reveal-card:hover .post-card-popout { max-height: 80px; opacity: 1; transform: translateY(0); margin-top: 14px; }
+		.reveal-card.is-active .read-more, .reveal-card:hover .read-more { transform: translateX(4px); color: color-mix(in srgb, var(--project-accent), white 18%); }
+		.hero::before { content: ''; position: absolute; width: 26rem; height: 26rem; right: -10rem; top: -12rem; border-radius: 50%; background: radial-gradient(circle, rgba(255,107,53,.26), transparent 62%); filter: blur(12px); animation: float-orb 8s ease-in-out infinite alternate; }
+		.hero::after { content: ''; position: absolute; width: 18rem; height: 18rem; left: 48%; bottom: -11rem; border-radius: 50%; background: radial-gradient(circle, rgba(22,199,168,.2), transparent 65%); filter: blur(10px); animation: float-orb 10s ease-in-out infinite alternate-reverse; }
+		.hero > * { position: relative; z-index: 1; }
+		@keyframes card-breathe { 0%,100% { box-shadow: 0 10px 30px rgba(15,23,42,.06); } 50% { box-shadow: 0 18px 58px color-mix(in srgb, var(--project-accent), transparent 88%); } }
+		@keyframes float-orb { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(-24px,18px,0) scale(1.08); } }
+		@media (prefers-reduced-motion: reduce) { .reveal-card, .card-preview, .post-card-popout, .hero::before, .hero::after { animation: none !important; transition: none !important; } .reveal-card.is-active, .reveal-card:hover { transform: none; } }
+
 		.no-results { display: none; padding: 24px; border: 1px dashed var(--border); border-radius: 20px; color: var(--text-secondary); text-align: center; }
 		.progress { position: fixed; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transform-origin: left; transform: scaleX(0); z-index: 2000; }
 		.article-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 30px; align-items: start; }
@@ -413,8 +447,8 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.footer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; }
 		.footer a { display: block; color: var(--text-secondary); margin: 7px 0; }
 		.footer a:hover { color: var(--accent); }
-		@media (max-width: 900px) { .hero-grid, .article-layout, .footer-grid { grid-template-columns: 1fr; } .toc-stack { position: static; } .controls { grid-template-columns: 1fr; } }
-		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { align-items: flex-start; border-radius: 22px; flex-direction: column; } .hero, .article-shell { border-radius: 24px; } .section-heading { align-items: start; flex-direction: column; } }
+		@media (max-width: 980px) { .hero-grid, .article-layout, .footer-grid { grid-template-columns: 1fr; } .toc-stack { position: static; } .controls { grid-template-columns: 1fr; } }
+		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { align-items: flex-start; border-radius: 22px; flex-direction: column; } .nav-links { justify-content: flex-start; } .hero, .article-shell { border-radius: 24px; } .section-heading { align-items: start; flex-direction: column; } .card-preview { grid-template-columns: repeat(2, 1fr); } }
 	</style>
 </head>
 <body>
@@ -453,7 +487,6 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 					<a href="https://github.com/Atlas-Os1" target="_blank" rel="noopener">GitHub: Atlas-Os1</a>
 					<a href="https://github.com/mintedmaterial" target="_blank" rel="noopener">GitHub: mintedmaterial</a>
 					<a href="https://twitter.com/AtlasOS_AI" target="_blank" rel="noopener">𝕏 @AtlasOS_AI</a>
-					<a href="https://moltbook.com/u/FloMinte" target="_blank" rel="noopener">Moltbook: FloMinte</a>
 				</div>
 			</div>
 			<p style="color: var(--text-secondary); font-size: .9rem; margin-top: 24px;">© ${new Date().getFullYear()} Atlas-OS · Built with Cloudflare Workers, R2, and AI.</p>
@@ -501,6 +534,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 					const matchesProject = activeProject === 'all' || card.dataset.project === activeProject;
 					const visible = matchesQuery && matchesProject;
 					card.style.display = visible ? '' : 'none';
+					if (!visible) card.classList.remove('is-active', 'is-inview');
 					if (visible) shown += 1;
 				});
 				if (empty) empty.style.display = shown ? 'none' : 'block';
@@ -511,6 +545,58 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 					activeProject = chip.dataset.projectFilter || 'all';
 					chips.forEach(function(c) { c.classList.toggle('active', c === chip); });
 					applyFilters();
+				});
+			});
+		})();
+		(function() {
+			const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+			const revealCards = Array.from(document.querySelectorAll('[data-reveal-card]'));
+			let activeCard = null;
+			const timers = new WeakMap();
+			function activate(card) {
+				if (card.style.display === 'none') return;
+				if (activeCard && activeCard !== card) activeCard.classList.remove('is-active');
+				activeCard = card;
+				card.classList.add('is-active');
+			}
+			function deactivate(card) {
+				const timer = timers.get(card);
+				if (timer) clearTimeout(timer);
+				card.classList.remove('is-inview');
+			}
+			if ('IntersectionObserver' in window) {
+				const observer = new IntersectionObserver(function(entries) {
+					entries.forEach(function(entry) {
+						const card = entry.target;
+						if (entry.isIntersecting && entry.intersectionRatio > 0.55) {
+							card.classList.add('is-inview');
+							const timer = setTimeout(function() { activate(card); }, reduceMotion ? 0 : 520);
+							timers.set(card, timer);
+						} else {
+							deactivate(card);
+						}
+					});
+				}, { threshold: [0, .35, .55, .75], rootMargin: '-12% 0px -18% 0px' });
+				revealCards.forEach(function(card) { observer.observe(card); });
+			}
+			revealCards.forEach(function(card) {
+				card.addEventListener('pointerenter', function() { activate(card); });
+				card.addEventListener('pointermove', function(event) {
+					const rect = card.getBoundingClientRect();
+					const x = event.clientX - rect.left;
+					const y = event.clientY - rect.top;
+					const px = x / rect.width;
+					const py = y / rect.height;
+					card.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
+					card.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+					if (!reduceMotion) {
+						card.style.setProperty('--rx', ((0.5 - py) * 4).toFixed(2) + 'deg');
+						card.style.setProperty('--ry', ((px - 0.5) * 5).toFixed(2) + 'deg');
+					}
+				});
+				card.addEventListener('pointerleave', function() {
+					card.style.setProperty('--rx', '0deg');
+					card.style.setProperty('--ry', '0deg');
 				});
 			});
 		})();
