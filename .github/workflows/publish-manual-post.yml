@@ -21,10 +21,11 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
 
@@ -92,6 +93,7 @@ jobs:
           POST_FILE: ${{ inputs.post_file }}
 
       - name: Upload post and updated index to R2
+        id: upload
         run: |
           POST_FILE="${{ inputs.post_file }}"
           SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
@@ -101,9 +103,25 @@ jobs:
         env:
           POST_FILE: ${{ inputs.post_file }}
 
+      - name: Refresh Worker cache after R2 publish
+        run: |
+          if [ -z "${ADMIN_TOKEN:-}" ]; then
+            echo "ADMIN_TOKEN secret is not configured; R2 publish succeeded, site will refresh after Worker cache TTL."
+            exit 0
+          fi
+
+          SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            "https://blog.minte.dev/admin/purge-cache?slug=${SLUG}"
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+
       - name: Summary
         run: |
           SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
           echo "Published: https://blog.minte.dev/posts/${SLUG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "R2-only publish: Worker code was not redeployed." >> "$GITHUB_STEP_SUMMARY"
         env:
           POST_FILE: ${{ inputs.post_file }}

@@ -521,6 +521,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 					<h3>Repos & Socials</h3>
 					<a href="https://github.com/Atlas-Os1" target="_blank" rel="noopener">GitHub: Atlas-Os1</a>
 					<a href="https://github.com/mintedmaterial" target="_blank" rel="noopener">GitHub: mintedmaterial</a>
+					<a href="https://x.com/Colt45reborn_s" target="_blank" rel="noopener">𝕏 @Colt45reborn_s</a>
 					<a href="https://twitter.com/AtlasOS_AI" target="_blank" rel="noopener">𝕏 @AtlasOS_AI</a>
 				</div>
 			</div>
@@ -1166,11 +1167,15 @@ app.post('/admin/purge-cache', async (c) => {
 	try {
 		const blogCache = caches.default;
 		
-		// Clear specific cache keys
+		// Clear index cache and, when provided, the just-published post cache key.
+		const slug = c.req.query('slug');
 		const keysToPurge = [
 			'https://cache/v2/posts-index.json',
 			'https://cache/v2/metadata/posts-index.json',
 		];
+		if (slug) {
+			keysToPurge.push(`https://cache/v2/posts/${slug}.json`);
+		}
 
 		for (const key of keysToPurge) {
 			await blogCache.delete(new Request(key));
@@ -1179,7 +1184,8 @@ app.post('/admin/purge-cache', async (c) => {
 		return c.json({ 
 			success: true, 
 			message: 'Cache purged successfully',
-			purged: keysToPurge.length 
+			purged: keysToPurge.length,
+			slug: slug || null,
 		});
 	} catch (error) {
 		return c.json({ 
