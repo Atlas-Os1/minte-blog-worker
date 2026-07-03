@@ -173,6 +173,12 @@ function normalize(value: string): string {
 }
 
 function inferProject(post: Omit<BlogPost, 'content'> | BlogPost): ProjectLink {
+	const explicitProject = typeof (post as any).project === 'string' ? normalize((post as any).project) : '';
+	if (explicitProject) {
+		const explicitMatch = PROJECTS.find((project) => project.slug === explicitProject || project.tags.includes(explicitProject));
+		if (explicitMatch) return explicitMatch;
+	}
+
 	const haystack = [post.title, post.description, ...post.tags, post.author].join(' ').toLowerCase();
 	return PROJECTS.find((project) => project.tags.some((tag) => haystack.includes(tag))) || PROJECTS[2];
 }
