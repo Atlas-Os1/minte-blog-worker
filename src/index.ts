@@ -467,6 +467,11 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.post-content a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 		.post-content ul, .post-content ol { margin: 1em 0 1em 1.4em; }
 		.post-content blockquote { border-left: 4px solid var(--accent); padding: 14px 0 14px 18px; margin: 24px 0; color: var(--text-secondary); background: var(--muted); border-radius: 0 16px 16px 0; }
+		.post-content figure { margin: 28px 0; padding: 12px; border: 1px solid var(--border); border-radius: 24px; background: var(--surface-strong); box-shadow: 0 16px 50px rgba(15,23,42,.08); }
+		.post-content figcaption { color: var(--text-secondary); font-size: .9rem; margin: 10px 4px 2px; }
+		.post-content iframe { width: 100%; min-height: min(76vh, 720px); border: 1px solid var(--border); border-radius: 22px; background: var(--bg-secondary); box-shadow: 0 16px 50px rgba(15,23,42,.12); }
+		.post-content .interactive-embed { margin: 32px 0; }
+		.post-content .interactive-embed iframe { display: block; aspect-ratio: 16 / 10; min-height: 460px; }
 		pre { background: var(--code-bg); padding: 18px; border-radius: 18px; overflow-x: auto; margin: 22px 0; }
 		code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace; font-size: .92rem; }
 		.toc-stack { position: sticky; top: 96px; display: grid; gap: 16px; }

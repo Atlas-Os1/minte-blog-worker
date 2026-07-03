@@ -7,6 +7,10 @@ on:
         description: Path to a checked-in post JSON file
         required: true
         default: manual-posts/2026-07-02-atlas-minte-autopilot-test.json
+      assets_dir:
+        description: Optional directory of assets to upload to R2 at assets/posts/<slug>/
+        required: false
+        default: ''
       bucket:
         description: R2 bucket name
         required: true
@@ -92,6 +96,57 @@ jobs:
         env:
           POST_FILE: ${{ inputs.post_file }}
 
+      - name: Upload optional post asset bundle to R2
+        run: |
+          ASSETS_DIR="${{ inputs.assets_dir }}"
+          if [ -z "$ASSETS_DIR" ]; then
+            echo "No assets_dir provided; skipping post asset upload."
+            exit 0
+          fi
+          if [ ! -d "$ASSETS_DIR" ]; then
+            echo "assets_dir does not exist or is not a directory: $ASSETS_DIR" >&2
+            exit 1
+          fi
+
+          SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
+          ASSET_COUNT=0
+          while IFS= read -r -d '' FILE; do
+            RELATIVE_PATH="${FILE#${ASSETS_DIR}/}"
+            KEY="assets/posts/${SLUG}/${RELATIVE_PATH}"
+            CONTENT_TYPE=$(node -e "const path=require('path'); const ext=path.extname(process.argv[1]).toLowerCase(); const map={'.avif':'image/avif','.css':'text/css; charset=utf-8','.gif':'image/gif','.htm':'text/html; charset=utf-8','.html':'text/html; charset=utf-8','.jpeg':'image/jpeg','.jpg':'image/jpeg','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.mp4':'video/mp4','.png':'image/png','.svg':'image/svg+xml; charset=utf-8','.txt':'text/plain; charset=utf-8','.webm':'video/webm','.webp':'image/webp'}; console.log(map[ext] || 'application/octet-stream')" "$FILE")
+            if [[ "$CONTENT_TYPE" == text/* || "$CONTENT_TYPE" == application/json* || "$CONTENT_TYPE" == image/svg+xml* ]]; then
+              node - "$FILE" <<'NODE'
+              const fs = require('fs');
+              const filePath = process.argv[2];
+              const raw = fs.readFileSync(filePath, 'utf8');
+              const patterns = [
+                /sk-ant-/i,
+                /ghp_/i,
+                /gho_/i,
+                /xox/i,
+                /localhost/i,
+                /127\.0\.0\.1/,
+                /\b10\.\d+\.\d+\.\d+\b/,
+                /\b172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+\b/,
+                /\b192\.168\.\d+\.\d+\b/,
+                /\b100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+\b/,
+                /password\s*[:=]/i,
+                /secret\s*[:=]/i,
+                /private key/i,
+              ];
+              const hit = patterns.find((pattern) => pattern.test(raw));
+              if (hit) throw new Error(`Asset safety scan failed for ${filePath}: ${hit}`);
+              NODE
+            fi
+            npx wrangler@latest r2 object put "${{ inputs.bucket }}/${KEY}" --file="$FILE" --content-type="$CONTENT_TYPE" --cache-control="public, max-age=31536000, immutable" --remote
+            ASSET_COUNT=$((ASSET_COUNT + 1))
+            echo "Uploaded /${KEY} (${CONTENT_TYPE})"
+          done < <(find "$ASSETS_DIR" -type f -print0)
+
+          echo "Uploaded ${ASSET_COUNT} assets to assets/posts/${SLUG}/"
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+
       - name: Upload post and updated index to R2
         id: upload
         run: |
@@ -122,6 +177,9 @@ jobs:
         run: |
           SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
           echo "Published: https://blog.minte.dev/posts/${SLUG}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${{ inputs.assets_dir }}" ]; then
+            echo "Assets: https://blog.minte.dev/assets/posts/${SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "R2-only publish: Worker code was not redeployed." >> "$GITHUB_STEP_SUMMARY"
         env:
           POST_FILE: ${{ inputs.post_file }}
