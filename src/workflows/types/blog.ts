@@ -60,7 +60,7 @@ export interface SecurityScanResult {
 }
 
 export interface SecurityFinding {
-  type: 'api_key' | 'token' | 'ip_address' | 'secret' | 'credential';
+  type: 'api_key' | 'token' | 'ip_address' | 'private_endpoint' | 'secret' | 'credential';
   pattern: string;
   line: number;
   redacted: string;

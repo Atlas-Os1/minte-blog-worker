@@ -1,5 +1,7 @@
 // manual-blog-gen.ts - Manual blog generation (simplified, no Workflows API)
 
+import { scanAndRedact } from './workflows/security-scanner';
+
 export interface SimpleBlogPost {
   slug: string;
   title: string;
@@ -358,14 +360,33 @@ echo "https://pub-xxx.r2.dev/project/code.ts"
 
 export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId: string, apiToken: string): Promise<{ success: boolean; url: string; error?: string }> {
   try {
-    // 1. Upload post JSON
+    // 1. Security-scan generated public fields before anything is published.
+    const titleScan = scanAndRedact(post.title);
+    const descriptionScan = scanAndRedact(post.description);
+    const contentScan = scanAndRedact(post.content);
+    const safePost: SimpleBlogPost = {
+      ...post,
+      title: titleScan.redactedContent,
+      description: descriptionScan.redactedContent,
+      content: contentScan.redactedContent,
+    };
+
+    if (!titleScan.clean || !descriptionScan.clean || !contentScan.clean) {
+      console.warn('[Blog Publish] Redacted sensitive data before publishing', {
+        titleFindings: titleScan.findings.length,
+        descriptionFindings: descriptionScan.findings.length,
+        contentFindings: contentScan.findings.length,
+      });
+    }
+
+    // 2. Upload post JSON
     await bucket.put(
-      `posts/${post.slug}.json`,
-      JSON.stringify(post, null, 2),
+      `posts/${safePost.slug}.json`,
+      JSON.stringify(safePost, null, 2),
       { httpMetadata: { contentType: 'application/json' } }
     );
 
-    // 2. Update posts-index.json
+    // 3. Update posts-index.json
     const indexObj = await bucket.get('posts-index.json');
     let index: PostIndex;
     
@@ -378,24 +399,27 @@ export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId
     
     // Update or add post (prevent duplicates)
     const postMeta = {
-      slug: post.slug,
-      title: post.title,
-      description: post.description,
-      pubDate: post.pubDate,
-      author: post.author,
-      tags: post.tags,
-      draft: post.draft
+      slug: safePost.slug,
+      title: safePost.title,
+      description: safePost.description,
+      pubDate: safePost.pubDate,
+      author: safePost.author,
+      tags: safePost.tags,
+      draft: safePost.draft
     };
     
     // Remove existing post with same slug (if any)
-    index.posts = index.posts.filter(p => p.slug !== post.slug);
+    index.posts = index.posts.filter(p => p.slug !== safePost.slug);
     
     // Add new/updated post at the beginning (newest first)
     index.posts.unshift(postMeta);
     
-    // Update tag counts
-    for (const tag of post.tags) {
-      index.tags[tag] = (index.tags[tag] || 0) + 1;
+    // Rebuild tag counts so replacing an existing slug cannot double-count stale tags.
+    index.tags = {};
+    for (const indexedPost of index.posts) {
+      for (const tag of indexedPost.tags || []) {
+        index.tags[tag] = (index.tags[tag] || 0) + 1;
+      }
     }
 
     await bucket.put(
@@ -407,7 +431,7 @@ export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId
     const urlsToPurge = [
       'https://blog.minte.dev/',
       'https://blog.minte.dev/rss.xml',
-      `https://blog.minte.dev/posts/${post.slug}`
+      `https://blog.minte.dev/posts/${safePost.slug}`
     ];
 
     const purgeResp = await fetch(
@@ -428,7 +452,7 @@ export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId
 
     return {
       success: true,
-      url: `https://blog.minte.dev/posts/${post.slug}`
+      url: `https://blog.minte.dev/posts/${safePost.slug}`
     };
   } catch (error) {
     return {

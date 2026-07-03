@@ -12,7 +12,26 @@ type Bindings = {
 	CLOUDFLARE_API_TOKEN: string;
 	GITHUB_TOKEN: string;
 	ADMIN_TOKEN?: string; // Bearer token for admin endpoints
+	MEMORY_PASSWORD?: string; // Optional gate for legacy/private memory archive
 };
+
+
+function getCookie(cookieHeader: string | undefined, name: string): string | undefined {
+	if (!cookieHeader) return undefined;
+	const prefix = `${name}=`;
+	return cookieHeader
+		.split(';')
+		.map((part) => part.trim())
+		.find((part) => part.startsWith(prefix))
+		?.slice(prefix.length);
+}
+
+function hasMemoryAccess(c: { req: { query: (name: string) => string | undefined; header: (name: string) => string | undefined } }, memoryPassword: string | undefined): boolean {
+	if (!memoryPassword) return false;
+	const submittedPassword = c.req.query('password') || c.req.header('X-Memory-Password');
+	const cookiePassword = getCookie(c.req.header('Cookie'), 'memory_access');
+	return submittedPassword === memoryPassword || cookiePassword === encodeURIComponent(memoryPassword);
+}
 
 // Rate limiting helper using Cache API
 async function checkRateLimit(
@@ -290,8 +309,8 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>${title} - Minte Blog</title>
-	<link rel="icon" type="image/png" href="${MINTE_FAVICON_URL}">
-	<link rel="shortcut icon" type="image/png" href="${MINTE_FAVICON_URL}">
+	<link rel="icon" href="${MINTE_FAVICON_URL}">
+	<link rel="shortcut icon" href="${MINTE_FAVICON_URL}">
 	<link rel="apple-touch-icon" href="${MINTE_FAVICON_URL}">
 	${metaTags}
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
@@ -351,8 +370,8 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 			background: var(--bg-secondary); backdrop-filter: blur(18px); box-shadow: 0 10px 30px rgba(15,23,42,.08);
 		}
 		.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.03em; }
-		.brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: white; box-shadow: 0 10px 24px rgba(255, 107, 53, .16); overflow: hidden; flex: 0 0 auto; }
-		.brand-mark img { width: 100%; height: 100%; display: block; object-fit: cover; border-radius: 50%; }
+		.brand-mark { display: grid; place-items: center; width: clamp(96px, 17vw, 128px); height: 42px; padding: 5px 9px; border-radius: 999px; background: white; box-shadow: 0 10px 24px rgba(255, 107, 53, .16); overflow: hidden; flex: 0 0 auto; }
+		.brand-mark img { width: 100%; height: 100%; display: block; object-fit: contain; border-radius: 0; }
 		.nav-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
 		.nav a:not(.brand) { padding: 8px 12px; color: var(--text-secondary); border-radius: 999px; font-size: .92rem; }
 		.nav a:hover { background: var(--muted); color: var(--text-primary); }
@@ -461,7 +480,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 	<button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" aria-label="Toggle theme">🌙</button>
 	<div class="container">
 		<nav class="nav" aria-label="Primary navigation">
-			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark"><img src="${MINTE_FAVICON_URL}" alt="" width="40" height="40"></span><span>Minte Build Log</span></a>
+			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark"><img src="${MINTE_FAVICON_URL}" alt="Minte.dev" width="128" height="42"></span><span>Build Log</span></a>
 			<div class="nav-links">
 				<a href="/#projects">Projects</a>
 				<a href="/#posts">Posts</a>
@@ -737,11 +756,9 @@ app.get('/', async (c) => {
 
 // Memory page with password protection
 app.get('/memory', async (c) => {
-	// Check for password in query param or cookie
-	const password = c.req.query('password') || c.req.header('X-Memory-Password');
-	const MEMORY_PASSWORD = 'atlas2026';
+	const memoryPassword = c.env.MEMORY_PASSWORD;
 	
-	if (password !== MEMORY_PASSWORD) {
+	if (!hasMemoryAccess(c, memoryPassword)) {
 		// Show password form
 		const passwordForm = `
 			<div style="max-width: 600px; margin: 100px auto; padding: 2rem; background: #1a1a1a; border-radius: 12px; text-align: center;">
@@ -784,7 +801,7 @@ app.get('/memory', async (c) => {
 		.map(
 			(post: any) => `
 		<div class="post-item">
-			<h2 class="post-title"><a href="/posts/${post.slug}?password=${MEMORY_PASSWORD}">${post.title}</a></h2>
+			<h2 class="post-title"><a href="/posts/${post.slug}">${post.title}</a></h2>
 			<div class="post-meta">
 				${new Date(post.pubDate).toLocaleDateString()} by ${post.author}
 			</div>
@@ -815,7 +832,9 @@ app.get('/memory', async (c) => {
 		</ul>
 	`;
 
-	return c.html(renderPage('Memory', content));
+	const response = c.html(renderPage('Memory', content));
+	response.headers.append('Set-Cookie', `memory_access=${encodeURIComponent(memoryPassword || '')}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400`);
+	return response;
 });
 
 // Post view: /posts/[slug]
@@ -836,11 +855,8 @@ app.get('/posts/:slug', async (c) => {
 	}
 
 	// Check if memory post and require password
-	if ((post as any).category === 'memory') {
-		const password = c.req.query('password');
-		if (password !== 'atlas2026') {
-			return c.redirect('/memory');
-		}
+	if ((post as any).category === 'memory' && !hasMemoryAccess(c, c.env.MEMORY_PASSWORD)) {
+		return c.redirect('/memory');
 	}
 
 	const contentWithoutH1 = stripLeadingH1(post.content, post.title);
@@ -972,7 +988,7 @@ app.get('/rss.xml', async (c) => {
 	}
 
 	const index: PostIndex = JSON.parse(indexData);
-	const publishedPosts = index.posts.filter((p) => !p.draft);
+	const publishedPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory');
 
 	const rssItems = publishedPosts
 		.map(
@@ -1018,7 +1034,7 @@ app.get('/sitemap.xml', async (c) => {
 	}
 
 	const index: PostIndex = JSON.parse(indexData);
-	const publishedPosts = index.posts.filter((p) => !p.draft);
+	const publishedPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory');
 
 	const urls = [
 		`<url>
@@ -1062,7 +1078,7 @@ app.get('/api/posts', async (c) => {
 	}
 
 	const index: PostIndex = JSON.parse(indexData);
-	const publishedPosts = index.posts.filter((p) => !p.draft);
+	const publishedPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory');
 
 	return c.json(
 		{
@@ -1090,7 +1106,7 @@ app.get('/api/posts/:slug', async (c) => {
 
 	const post: BlogPost = JSON.parse(postData);
 
-	if (post.draft) {
+	if (post.draft || (post as any).category === 'memory') {
 		return c.json({ error: 'Post not found' }, 404);
 	}
 
