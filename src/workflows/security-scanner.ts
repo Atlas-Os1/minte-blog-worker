@@ -86,10 +86,25 @@ const SENSITIVE_PATTERNS: Array<{
     description: 'Secret in config'
   },
   
-  // IP Addresses (private ranges ok, but flag others)
+  // Network endpoints. Public blog posts should not leak IPs or private/local endpoints.
+  {
+    type: 'private_endpoint',
+    pattern: /\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})(?::\d+)?\b/g,
+    description: 'Private/internal IP address or Tailscale endpoint'
+  },
+  {
+    type: 'private_endpoint',
+    pattern: /\b(?:localhost|127\.0\.0\.1)(?::\d+)?\b/gi,
+    description: 'Localhost endpoint'
+  },
+  {
+    type: 'private_endpoint',
+    pattern: /https?:\/\/(?:localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})(?::\d+)?(?:\/[^\s`)]*)?/gi,
+    description: 'Private/internal URL'
+  },
   {
     type: 'ip_address',
-    pattern: /\b(?!10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
+    pattern: /\b(?!10\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.|127\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
     description: 'Public IP address'
   }
 ];
@@ -97,7 +112,6 @@ const SENSITIVE_PATTERNS: Array<{
 // Additional context patterns to reduce false positives
 const FALSE_POSITIVE_CONTEXTS = [
   /example\.com/i,
-  /localhost/i,
   /placeholder/i,
   /your[-_]?api[-_]?key/i,
   /xxx+/i,
@@ -194,6 +208,9 @@ function generateRedaction(text: string, type: SecurityFinding['type']): string 
     
     case 'ip_address':
       return text.replace(/\d+\.\d+\.\d+\.\d+/, '[IP_REDACTED]');
+
+    case 'private_endpoint':
+      return '[PRIVATE_ENDPOINT_REDACTED]';
     
     default:
       return '[REDACTED]';
