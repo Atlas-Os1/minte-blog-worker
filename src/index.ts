@@ -103,6 +103,17 @@ type ProjectLink = {
 	tags: string[];
 };
 
+type ToolLink = {
+	slug: string;
+	name: string;
+	description: string;
+	url: string;
+	logo: string;
+	logoUrl?: string;
+	accent: string;
+	status?: string;
+};
+
 const MINTE_FAVICON_URL = 'https://pub-0be86ba29d2f4e66b59fe97deb2ea9d3.r2.dev/assets/favicon.png';
 
 const PROJECTS: ProjectLink[] = [
@@ -156,6 +167,91 @@ const PROJECTS: ProjectLink[] = [
 		repo: 'https://github.com/Atlas-Os1/flo-social-worker',
 		accent: '#facc15',
 		tags: ['flo-social-worker', 'social', 'facebook', 'automation'],
+	},
+];
+
+const TOOL_LINKS: ToolLink[] = [
+	{
+		slug: 'photon-codes',
+		name: 'Photon Codes',
+		description: 'Code workflow slot reserved while the referral link is finalized.',
+		url: 'https://photon.codes/',
+		logo: 'PC',
+		logoUrl: 'https://app.photon.codes/icon0.svg?icon0.38661a6d.svg',
+		accent: '#f97316',
+		status: 'Referral link coming soon',
+	},
+	{
+		slug: 'cloudflare',
+		name: 'Cloudflare',
+		description: 'Workers, R2, Workflows, DNS, caching, and the edge runtime behind this blog.',
+		url: 'https://www.cloudflare.com/',
+		logo: 'CF',
+		logoUrl: 'https://www.cloudflare.com/favicon.ico',
+		accent: '#f6821f',
+	},
+	{
+		slug: 'cloudflare-developers',
+		name: 'Cloudflare Developers',
+		description: 'The developer platform docs and products used for Workers-native builds.',
+		url: 'https://developers.cloudflare.com/',
+		logo: 'DEV',
+		logoUrl: 'https://developers.cloudflare.com/favicon.ico',
+		accent: '#facc15',
+	},
+	{
+		slug: 'hermes',
+		name: 'Hermes Agent',
+		description: 'The agent runtime coordinating coding, memory, publishing, and operations workflows.',
+		url: 'https://hermes-agent.nousresearch.com/',
+		logo: 'H',
+		logoUrl: 'https://hermes-agent.nousresearch.com/favicon.ico',
+		accent: '#8b5cf6',
+	},
+	{
+		slug: 'github',
+		name: 'GitHub',
+		description: 'Source control, issues, Actions, and the public repos that make the work inspectable.',
+		url: 'https://github.com/Atlas-Os1',
+		logo: 'GH',
+		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
+		accent: '#24292f',
+	},
+	{
+		slug: 'openmontage',
+		name: 'OpenMontage',
+		description: 'Open creative/media tooling and experiments from the Atlas-OS workspace.',
+		url: 'https://github.com/Atlas-Os1/OpenMontage',
+		logo: 'OM',
+		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
+		accent: '#f472b6',
+	},
+	{
+		slug: 'opencode',
+		name: 'OpenCode',
+		description: 'Terminal-native coding agent workflow used for implementation and review loops.',
+		url: 'https://github.com/anomalyco/opencode',
+		logo: 'OC',
+		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
+		accent: '#22c55e',
+	},
+	{
+		slug: 'anthropic',
+		name: 'Anthropic',
+		description: 'Claude models for long-context reasoning, coding assistance, and review support.',
+		url: 'https://www.anthropic.com/',
+		logo: 'A',
+		logoUrl: 'https://www.anthropic.com/favicon.ico',
+		accent: '#d97757',
+	},
+	{
+		slug: 'openai',
+		name: 'OpenAI',
+		description: 'Models and APIs used across agent, coding, and automation experiments.',
+		url: 'https://openai.com/',
+		logo: 'AI',
+		logoUrl: 'https://openai.com/favicon.ico',
+		accent: '#10a37f',
 	},
 ];
 
@@ -237,6 +333,23 @@ function renderProjectCard(project: ProjectLink, compact = false): string {
 				<a href="${project.repo}" target="_blank" rel="noopener">GitHub</a>
 			</div>
 		</article>`;
+}
+
+
+function renderToolCard(tool: ToolLink): string {
+	return `
+		<a class="tool-card reveal-card" data-reveal-card href="${tool.url}" target="_blank" rel="noopener" style="--tool-accent: ${tool.accent}; --project-accent: ${tool.accent}">
+			<div class="card-ambient" aria-hidden="true"></div>
+			<div class="tool-logo" aria-hidden="true">${tool.logoUrl ? `<img src="${tool.logoUrl}" alt="" loading="lazy" onerror="this.remove(); this.parentElement.textContent='${escapeHtml(tool.logo)}';">` : escapeHtml(tool.logo)}</div>
+			<div>
+				<div class="tool-title-row">
+					<h3>${escapeHtml(tool.name)}</h3>
+					<span>↗</span>
+				</div>
+				<p>${escapeHtml(tool.description)}</p>
+				${tool.status ? `<span class="tool-status">${escapeHtml(tool.status)}</span>` : ''}
+			</div>
+		</a>`;
 }
 
 function renderPostCard(post: Omit<BlogPost, 'content'>): string {
@@ -411,11 +524,21 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.section-heading { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 18px; }
 		.section-heading p { color: var(--text-secondary); max-width: 65ch; }
 		.project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+		.tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
 		.project-card { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-height: 220px; padding: 22px; border: 1px solid var(--border); border-radius: 24px; background: var(--surface); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
 		.project-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 4px; background: var(--project-accent); }
 		.project-card:hover { transform: translateY(-5px); border-color: var(--project-accent); box-shadow: 0 18px 50px rgba(15,23,42,.12); }
 		.project-card p { color: var(--text-secondary); }
 		.project-card.compact { min-height: auto; }
+		.tool-card { position: relative; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; min-height: 168px; padding: 18px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+		.tool-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tool-accent); }
+		.tool-card:hover { transform: translateY(-5px); border-color: var(--tool-accent); box-shadow: 0 18px 50px color-mix(in srgb, var(--tool-accent), transparent 82%); }
+		.tool-card .card-ambient { background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--tool-accent), transparent 52%), transparent 44%); }
+		.tool-logo { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; color: white; background: linear-gradient(135deg, var(--tool-accent), color-mix(in srgb, var(--tool-accent), #020617 22%)); font-weight: 900; letter-spacing: -.04em; box-shadow: 0 14px 32px color-mix(in srgb, var(--tool-accent), transparent 72%); }
+		.tool-logo img { width: 28px; height: 28px; border-radius: 7px; object-fit: contain; background: rgba(255,255,255,.92); padding: 3px; }
+		.tool-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+		.tool-card p { color: var(--text-secondary); margin-top: 7px; }
+		.tool-status { display: inline-flex; width: fit-content; margin-top: 12px; padding: 5px 9px; border-radius: 999px; color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent), transparent 86%); font-size: .78rem; font-weight: 800; }
 		.controls { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 18px; }
 		.search-box { width: 100%; min-height: 48px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-strong); color: var(--text-primary); padding: 0 16px; font: inherit; }
 		.filter-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -499,6 +622,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark"><img src="${MINTE_FAVICON_URL}" alt="" width="42" height="42"></span><span class="brand-copy"><span class="brand-name">Minte.dev</span><span class="brand-subtitle">Build Log</span></span></a>
 			<div class="nav-links">
 				<a href="/#projects">Projects</a>
+				<a href="/#products">Products</a>
 				<a href="/#posts">Posts</a>
 				<a href="https://handybeaver.co/" target="_blank" rel="noopener">Handy Beaver</a>
 				<a href="https://kiamichibizconnect.com/" target="_blank" rel="noopener">KBC</a>
@@ -705,6 +829,7 @@ app.get('/', async (c) => {
 	const index: PostIndex = JSON.parse(indexData);
 	const publishedPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory');
 	const featuredProjects = PROJECTS.slice(0, 6).map((project) => renderProjectCard(project)).join('');
+	const productStack = TOOL_LINKS.map((tool) => renderToolCard(tool)).join('');
 	const postsHtml = publishedPosts.map(renderPostCard).join('');
 	const topTags = Object.entries(index.tags)
 		.sort((a, b) => b[1] - a[1])
@@ -744,6 +869,17 @@ app.get('/', async (c) => {
 				<p>These cards make the blog work as a portfolio and navigation hub, not just a dated archive.</p>
 			</div>
 			<div class="project-grid">${featuredProjects}</div>
+		</section>
+
+		<section class="section" id="products">
+			<div class="section-heading">
+				<div>
+					<p class="eyebrow">Products we use</p>
+					<h2>The tools and platforms behind the build log.</h2>
+				</div>
+				<p>A quick stack shelf for the products, developer platforms, and open repos powering Atlas / Minte projects. Photon is linked now and has a reserved referral spot for the final URL.</p>
+			</div>
+			<div class="tool-grid">${productStack}</div>
 		</section>
 
 		<section class="section" id="posts">
