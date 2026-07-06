@@ -109,6 +109,7 @@ type ToolLink = {
 	description: string;
 	url: string;
 	logo: string;
+	logoUrl?: string;
 	accent: string;
 	status?: string;
 };
@@ -176,6 +177,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'Code workflow slot reserved while the referral link is finalized.',
 		url: 'https://photon.codes/',
 		logo: 'PC',
+		logoUrl: 'https://photon.codes/favicon.ico',
 		accent: '#f97316',
 		status: 'Referral link coming soon',
 	},
@@ -185,6 +187,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'Workers, R2, Workflows, DNS, caching, and the edge runtime behind this blog.',
 		url: 'https://www.cloudflare.com/',
 		logo: 'CF',
+		logoUrl: 'https://www.cloudflare.com/favicon.ico',
 		accent: '#f6821f',
 	},
 	{
@@ -193,6 +196,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'The developer platform docs and products used for Workers-native builds.',
 		url: 'https://developers.cloudflare.com/',
 		logo: 'DEV',
+		logoUrl: 'https://developers.cloudflare.com/favicon.ico',
 		accent: '#facc15',
 	},
 	{
@@ -201,6 +205,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'The agent runtime coordinating coding, memory, publishing, and operations workflows.',
 		url: 'https://hermes-agent.nousresearch.com/',
 		logo: 'H',
+		logoUrl: 'https://hermes-agent.nousresearch.com/favicon.ico',
 		accent: '#8b5cf6',
 	},
 	{
@@ -209,6 +214,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'Source control, issues, Actions, and the public repos that make the work inspectable.',
 		url: 'https://github.com/Atlas-Os1',
 		logo: 'GH',
+		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
 		accent: '#24292f',
 	},
 	{
@@ -217,6 +223,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'Open creative/media tooling and experiments from the Atlas-OS workspace.',
 		url: 'https://github.com/Atlas-Os1/OpenMontage',
 		logo: 'OM',
+		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
 		accent: '#f472b6',
 	},
 	{
@@ -225,6 +232,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'Terminal-native coding agent workflow used for implementation and review loops.',
 		url: 'https://github.com/anomalyco/opencode',
 		logo: 'OC',
+		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
 		accent: '#22c55e',
 	},
 	{
@@ -233,6 +241,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'Claude models for long-context reasoning, coding assistance, and review support.',
 		url: 'https://www.anthropic.com/',
 		logo: 'A',
+		logoUrl: 'https://www.anthropic.com/favicon.ico',
 		accent: '#d97757',
 	},
 	{
@@ -241,6 +250,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'Models and APIs used across agent, coding, and automation experiments.',
 		url: 'https://openai.com/',
 		logo: 'AI',
+		logoUrl: 'https://openai.com/favicon.ico',
 		accent: '#10a37f',
 	},
 ];
@@ -330,7 +340,7 @@ function renderToolCard(tool: ToolLink): string {
 	return `
 		<a class="tool-card reveal-card" data-reveal-card href="${tool.url}" target="_blank" rel="noopener" style="--tool-accent: ${tool.accent}; --project-accent: ${tool.accent}">
 			<div class="card-ambient" aria-hidden="true"></div>
-			<div class="tool-logo" aria-hidden="true">${escapeHtml(tool.logo)}</div>
+			<div class="tool-logo" aria-hidden="true">${tool.logoUrl ? `<img src="${tool.logoUrl}" alt="" loading="lazy" onerror="this.remove(); this.parentElement.textContent='${escapeHtml(tool.logo)}';">` : escapeHtml(tool.logo)}</div>
 			<div>
 				<div class="tool-title-row">
 					<h3>${escapeHtml(tool.name)}</h3>
@@ -525,6 +535,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.tool-card:hover { transform: translateY(-5px); border-color: var(--tool-accent); box-shadow: 0 18px 50px color-mix(in srgb, var(--tool-accent), transparent 82%); }
 		.tool-card .card-ambient { background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--tool-accent), transparent 52%), transparent 44%); }
 		.tool-logo { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; color: white; background: linear-gradient(135deg, var(--tool-accent), color-mix(in srgb, var(--tool-accent), #020617 22%)); font-weight: 900; letter-spacing: -.04em; box-shadow: 0 14px 32px color-mix(in srgb, var(--tool-accent), transparent 72%); }
+		.tool-logo img { width: 28px; height: 28px; border-radius: 7px; object-fit: contain; background: rgba(255,255,255,.92); padding: 3px; }
 		.tool-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 		.tool-card p { color: var(--text-secondary); margin-top: 7px; }
 		.tool-status { display: inline-flex; width: fit-content; margin-top: 12px; padding: 5px 9px; border-radius: 999px; color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent), transparent 86%); font-size: .78rem; font-weight: 800; }
