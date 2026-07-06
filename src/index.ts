@@ -398,24 +398,16 @@ function renderAssetGallery(post: BlogPost): string {
 			<div class="section-heading compact">
 				<div>
 					<p class="eyebrow">Attachment bundle</p>
-					<h2>Assets referenced by this build note</h2>
+					<h2>Files attached to this build note</h2>
 				</div>
-				<p>Images, diagrams, video clips, and other files are served from the post's R2 asset bundle.</p>
+				<p>Compact links to the R2 bundle. Inline diagrams stay scrollable above instead of being duplicated as oversized cards.</p>
 			</div>
-			<div class="asset-grid">
+			<div class="asset-link-grid">
 				${refs.map((ref) => {
 					const kind = assetKind(ref);
 					const label = decodeURIComponent(ref.split('/').pop() || ref);
-					if (kind === 'image') {
-						return `<figure class="asset-card"><a href="${ref}" target="_blank" rel="noopener"><img src="${ref}" loading="lazy" alt="${escapeHtml(label)}"></a><figcaption>${escapeHtml(label)}</figcaption></figure>`;
-					}
-					if (kind === 'video') {
-						return `<figure class="asset-card"><video controls preload="metadata" playsinline src="${ref}"></video><figcaption><a href="${ref}" target="_blank" rel="noopener">${escapeHtml(label)}</a></figcaption></figure>`;
-					}
-					if (kind === 'embed') {
-						return `<figure class="asset-card wide"><iframe src="${ref}" loading="lazy" title="${escapeHtml(label)}"></iframe><figcaption><a href="${ref}" target="_blank" rel="noopener">${escapeHtml(label)}</a></figcaption></figure>`;
-					}
-					return `<a class="asset-card asset-file" href="${ref}" target="_blank" rel="noopener"><strong>${escapeHtml(label)}</strong><span>Open attachment →</span></a>`;
+					const icon = kind === 'video' ? '▶' : kind === 'image' ? '▧' : kind === 'embed' ? '⌁' : '↗';
+					return `<a class="asset-link-card" href="${ref}" target="_blank" rel="noopener"><span class="asset-icon">${icon}</span><span><strong>${escapeHtml(label)}</strong><small>${kind} attachment</small></span></a>`;
 				}).join('')}
 			</div>
 		</section>`;
@@ -700,16 +692,17 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.post-content iframe { width: 100%; min-height: min(76vh, 720px); border: 1px solid var(--border); border-radius: 22px; background: var(--bg-secondary); box-shadow: 0 16px 50px rgba(15,23,42,.12); }
 		.post-content .interactive-embed { margin: 32px 0; }
 		.post-content .interactive-embed iframe { display: block; aspect-ratio: 16 / 10; min-height: 460px; }
-		.post-content img, .post-content video, .asset-card img, .asset-card video { display: block; width: 100%; max-width: 100%; height: auto; }
+		.post-content img, .post-content video { display: block; width: 100%; max-width: 100%; height: auto; }
 		.post-content video { border-radius: 18px; margin: 24px 0; background: #000; box-shadow: 0 16px 50px rgba(15,23,42,.12); }
-		.asset-gallery { margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--border); }
+		.post-content p:has(> img:only-child) { overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-inline: contain; padding-bottom: 8px; }
+		.post-content p:has(> img:only-child)::after { content: 'Swipe sideways to inspect'; display: none; color: var(--text-secondary); font-size: .78rem; margin-top: 6px; }
+		.asset-gallery { margin-top: 34px; padding-top: 24px; border-top: 1px solid var(--border); }
 		.section-heading.compact { align-items: start; }
-		.asset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
-		.asset-card { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface-strong); box-shadow: 0 12px 34px rgba(15,23,42,.08); }
-		.asset-card.wide { grid-column: 1 / -1; }
-		.asset-card iframe { width: 100%; min-height: min(72vh, 620px); border: 0; border-radius: 16px; background: var(--bg-secondary); }
-		.asset-card figcaption, .asset-file span { color: var(--text-secondary); font-size: .88rem; margin-top: 8px; overflow-wrap: anywhere; }
-		.asset-file { display: grid; gap: 8px; color: var(--text-primary); text-decoration: none; }
+		.asset-link-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 14px; }
+		.asset-link-card { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-strong); text-decoration: none; }
+		.asset-link-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		.asset-link-card small { display: block; color: var(--text-secondary); font-size: .78rem; }
+		.asset-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: white; background: var(--accent); font-weight: 900; }
 		pre { background: var(--code-bg); padding: 18px; border-radius: 18px; overflow-x: auto; margin: 22px 0; }
 		code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace; font-size: .92rem; }
 		.toc-stack { position: sticky; top: 96px; display: grid; gap: 16px; }
@@ -726,7 +719,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.footer a { display: block; color: var(--text-secondary); margin: 7px 0; }
 		.footer a:hover { color: var(--accent); }
 		@media (max-width: 980px) { .hero-grid, .article-layout, .footer-grid { grid-template-columns: 1fr; } .toc-stack { position: static; } .controls { grid-template-columns: 1fr; } }
-		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { position: static; align-items: flex-start; border-radius: 22px; flex-direction: column; } .brand-name { font-size: 1.1rem; } .nav-links { width: 100%; justify-content: flex-start; gap: 4px; } .nav a:not(.brand) { padding: 7px 9px; font-size: .84rem; } .theme-toggle { right: 14px; bottom: 14px; width: 42px; height: 42px; } .hero, .article-shell { border-radius: 24px; padding: 22px; } .hero-actions, .post-actions, .pager { align-items: stretch; flex-direction: column; } .btn, .share-link { width: 100%; justify-content: center; text-align: center; } .section-heading { align-items: start; flex-direction: column; } .post-card-topline, .post-card-footer, .article-meta { align-items: flex-start; flex-direction: column; gap: 8px; } .card-preview { grid-template-columns: repeat(2, 1fr); } .post-content { font-size: 1rem; } .post-content .interactive-embed iframe, .asset-card iframe { min-height: 320px; } .asset-grid { grid-template-columns: 1fr; } pre { margin-inline: -8px; border-radius: 14px; } }
+		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { position: static; align-items: flex-start; border-radius: 22px; flex-direction: column; } .brand-name { font-size: 1.1rem; } .nav-links { width: 100%; justify-content: flex-start; gap: 4px; } .nav a:not(.brand) { padding: 7px 9px; font-size: .84rem; } .theme-toggle { right: 14px; bottom: 14px; width: 42px; height: 42px; } .hero, .article-shell { border-radius: 24px; padding: 18px; } .hero-actions, .post-actions, .pager { align-items: stretch; flex-direction: column; } .btn, .share-link { width: 100%; justify-content: center; text-align: center; } .section-heading { align-items: start; flex-direction: column; } .post-card-topline, .post-card-footer, .article-meta { align-items: flex-start; flex-direction: column; gap: 8px; } .card-preview { grid-template-columns: repeat(2, 1fr); } .post-content { font-size: 1rem; } .post-content p:has(> img[src$='.svg']:only-child) img, .post-content p:has(> img[src*='.svg?']:only-child) img { width: 820px; max-width: none; } .post-content p:has(> img:only-child)::after { display: block; } .post-content .interactive-embed iframe { min-height: 320px; } .asset-link-grid { grid-template-columns: 1fr; } pre { max-width: 100%; margin-inline: -8px; border-radius: 14px; } code { overflow-wrap: anywhere; } }
 	</style>
 </head>
 <body>
