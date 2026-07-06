@@ -160,33 +160,48 @@ export class BlogWorkflow extends WorkflowEntrypoint<BlogWorkflowEnv, WorkflowSt
   // ═══════════════════════════════════════════════════════════════
   private async publishComplete(post: BlogPost): Promise<PublishResult> {
     const bucket = this.env.BLOG_BUCKET;
+    const publicPost = {
+      slug: post.slug,
+      title: post.title,
+      description: post.excerpt,
+      pubDate: post.publishedAt,
+      author: post.author,
+      tags: post.tags,
+      content: post.content,
+      draft: false,
+      heroImage: post.heroImage,
+      project: 'minte-blog-worker',
+    };
 
-    // 1. Upload post JSON
+    // 1. Upload renderer-compatible post JSON
     await bucket.put(
       `posts/${post.slug}.json`,
-      JSON.stringify(post, null, 2),
+      JSON.stringify(publicPost, null, 2),
       { httpMetadata: { contentType: 'application/json' } }
     );
 
-    // 2. Update posts-index.json
-    const indexObj = await bucket.get('metadata/posts-index.json');
-    const posts: PostMeta[] = indexObj 
-      ? await indexObj.json() 
-      : [];
+    // 2. Update the same posts-index.json consumed by the public site
+    const indexObj = await bucket.get('posts-index.json');
+    const index: { posts: any[]; tags: Record<string, number> } = indexObj
+      ? await indexObj.json()
+      : { posts: [], tags: {} };
     
-    // Prepend new post (newest first)
-    posts.unshift({
-      slug: post.slug,
-      title: post.title,
-      date: post.publishedAt,
-      tags: post.tags,
-      excerpt: post.excerpt,
-      heroImage: post.heroImage
-    });
+    const postMeta = { ...publicPost };
+    delete (postMeta as any).content;
+    index.posts = (index.posts || []).filter((existing) => existing.slug !== post.slug);
+    index.posts.unshift(postMeta);
+    index.tags = {};
+    for (const indexedPost of index.posts) {
+      if (indexedPost.draft || indexedPost.category === 'memory') continue;
+      for (const tag of indexedPost.tags || []) {
+        index.tags[tag] = (index.tags[tag] || 0) + 1;
+      }
+    }
 
     await bucket.put(
-      'metadata/posts-index.json',
-      JSON.stringify(posts, null, 2)
+      'posts-index.json',
+      JSON.stringify(index, null, 2),
+      { httpMetadata: { contentType: 'application/json' } }
     );
 
     // 3. Purge Cloudflare cache
