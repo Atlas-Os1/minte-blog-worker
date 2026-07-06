@@ -13,6 +13,9 @@ export interface SimpleBlogPost {
   draft: boolean;
   project?: string;
   readingTime?: string;
+  category?: string;
+  heroImage?: string;
+  assets?: string[];
 }
 
 export interface PostIndex {
@@ -24,25 +27,61 @@ interface MemoryHighlight {
   date: string;
   content: string;
   headers: string[];
+  bullets: string[];
+  sourceKey: string;
+}
+
+const MEMORY_PREFIXES = [
+  'workspace/memory/',
+  'workspace/shared-memory/',
+  'shared-memory/',
+  'memory/',
+  'hermes-memory/',
+];
+
+function extractBullets(content: string): string[] {
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^[-*]\s+\S/.test(line))
+    .map((line) => line.replace(/^[-*]\s+/, '').replace(/\s+/g, ' ').trim())
+    .filter((line) => line.length > 8 && !/(token|secret|password|private key)/i.test(line))
+    .slice(0, 12);
 }
 
 async function parseMemoryFile(bucket: R2Bucket, date: string): Promise<MemoryHighlight | null> {
-  try {
-    const obj = await bucket.get(`workspace/memory/${date}.md`);
-    if (!obj) return null;
-    
-    const content = await obj.text();
-    const headers = content.match(/^##? .+$/gm) || [];
-    
-    return {
-      date,
-      content: content.slice(0, 1000), // First 1000 chars for context
-      headers: headers.map((h: string) => h.replace(/^##? /, ''))
-    };
-  } catch (error) {
-    console.error(`Failed to parse memory for ${date}:`, error);
-    return null;
+  for (const prefix of MEMORY_PREFIXES) {
+    const key = `${prefix}${date}.md`;
+    try {
+      const obj = await bucket.get(key);
+      if (!obj) continue;
+      const content = await obj.text();
+      const headers = content.match(/^#{1,3} .+$/gm) || [];
+      return {
+        date,
+        content: content.slice(0, 4000),
+        headers: headers.map((h: string) => h.replace(/^#{1,3} /, '')),
+        bullets: extractBullets(content),
+        sourceKey: key,
+      };
+    } catch (error) {
+      console.error(`Failed to parse memory for ${key}:`, error);
+    }
   }
+  return null;
+}
+
+function bulletSummary(memory: MemoryHighlight | null, githubActivity: string): string[] {
+  const bullets = [...(memory?.bullets || [])];
+  if (bullets.length === 0 && memory?.headers.length) {
+    bullets.push(...memory.headers.slice(0, 8));
+  }
+  if (githubActivity.trim()) {
+    bullets.push(summarizeGitHubActivity(githubActivity));
+  }
+  return Array.from(new Set(bullets))
+    .slice(0, 8)
+    .map((item) => item.replace(/[\r\n]+/g, ' ').trim());
 }
 
 async function fetchGitHubActivity(bucket: R2Bucket, date: string): Promise<string> {
@@ -122,9 +161,11 @@ export async function generateBlogPost(bucket: R2Bucket, githubToken?: string): 
 
 ## What Happened on ${dateStr}
 
-${memory.headers.map((h, i) => `${i + 1}. **${h}**`).join('\n')}
+${bulletSummary(memory, githubActivity).map((item) => `- **${item.split(':')[0]}**${item.includes(':') ? ':' + item.split(':').slice(1).join(':') : ''}`).join('\n')}
 
 ---
+
+### Source memory context
 
 ${memory.content}
 
@@ -132,7 +173,7 @@ ${memory.content}
 
 ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` : ''}
 
-**Development Notes:** Daily log automatically generated from workspace memory files${githubActivity ? ' and GitHub activity' : ''}.
+**Development Notes:** Daily log automatically generated from shared workspace memory files${githubActivity ? ' and GitHub activity' : ''}. Source: ${memory.sourceKey}.
 
 ---
 
@@ -147,9 +188,7 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
     tags = ['daily-update', 'building-in-public', ...inferTagsFromText(githubActivity)];
     content = `# ${title}
 
-No major activities logged for ${dateStr}.
-
-Continuing development work across Handy Beaver, Kiamichi Biz Connect, Minte Blog Worker, OpenClaw memory, and related Cloudflare repos.
+${bulletSummary(memory, githubActivity).length ? bulletSummary(memory, githubActivity).map((item) => `- **${item}**`).join('\n') : '- **Systems check:** No major shared-memory bullets were logged for this date.\n- **Ongoing work:** Continuing development across Handy Beaver, Kiamichi Biz Connect, Minte Blog Worker, OpenClaw memory, and related Cloudflare repos.'}
 
 ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` : ''}
 
@@ -181,6 +220,46 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
   };
 
   return post;
+}
+
+
+export async function generateMemoryDigestPost(bucket: R2Bucket): Promise<SimpleBlogPost> {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateStr = yesterday.toISOString().split('T')[0];
+  const memory = await parseMemoryFile(bucket, dateStr);
+  const bullets = bulletSummary(memory, '');
+  const title = `Shared Memory Digest - ${dateStr}`;
+  const summary = bullets.length
+    ? bullets.map((item) => `- ${item}`).join('\n')
+    : '- No shared-memory bullets were found for this date.';
+
+  const content = `# ${title}
+
+## Daily changes
+
+${summary}
+
+${memory ? `## Source context\n\n${memory.content}` : '## Source context\n\nNo memory source object was found in the configured blog/shared-memory prefixes.'}
+
+---
+
+Generated automatically for the protected memory section from shared workspace memory.`;
+
+  return {
+    slug: `${dateStr}-shared-memory-digest`,
+    title,
+    description: `Protected shared-memory digest for ${dateStr}.`,
+    pubDate: new Date().toISOString(),
+    author: 'Dev',
+    tags: ['memory', 'daily-update', 'shared-memory', ...inferTagsFromText(content)],
+    content,
+    draft: false,
+    category: 'memory',
+    project: 'openclaw',
+    readingTime: estimateReadingTime(content),
+  };
 }
 
 // Keep the old R2 collaboration post function for reference
@@ -398,14 +477,19 @@ export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId
     }
     
     // Update or add post (prevent duplicates)
-    const postMeta = {
+    const postMeta: Omit<SimpleBlogPost, 'content'> = {
       slug: safePost.slug,
       title: safePost.title,
       description: safePost.description,
       pubDate: safePost.pubDate,
       author: safePost.author,
       tags: safePost.tags,
-      draft: safePost.draft
+      draft: safePost.draft,
+      project: safePost.project,
+      readingTime: safePost.readingTime,
+      category: safePost.category,
+      heroImage: safePost.heroImage,
+      assets: safePost.assets,
     };
     
     // Remove existing post with same slug (if any)

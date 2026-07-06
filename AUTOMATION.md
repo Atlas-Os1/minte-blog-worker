@@ -44,17 +44,16 @@ This will:
 cd /home/flo/minte-blog-worker && npm run deploy
 ```
 
-### Automated Daily Blog (9 AM CST)
+### Automated Daily Blog + Memory Digest (9 AM CST)
 
-**Current Status:** ⏳ Not yet automated
+**Current Status:** ✅ Worker cron configured in `wrangler.jsonc` (`0 15 * * *`). The scheduled handler generates and publishes two R2-backed posts:
 
-**Plan:**
-1. Cron job at 9 AM CST generates draft blog from yesterday's memory
-2. Posts preview to Discord #blog-approvals
-3. On `approve blog` → Publish with script above
-4. Trigger worker redeploy for immediate visibility
+1. **Public build note** at `/posts/YYYY-MM-DD-daily-update` — concise bullet list plus short descriptions, generated from the prior day's shared/workspace memory and GitHub activity.
+2. **Protected memory digest** at `/memory` / `/posts/YYYY-MM-DD-shared-memory-digest` — category `memory`, hidden from the public homepage/API, and available only behind `MEMORY_PASSWORD`.
 
-**To implement:** Add cron job via Clawdbot gateway
+Memory source lookup checks these R2 prefixes in `minte-blog-prod`: `workspace/memory/`, `workspace/shared-memory/`, `shared-memory/`, `memory/`, and `hermes-memory/`.
+
+The publish path updates `posts-index.json`, keeps memory posts out of public tag counts, and purges Worker cache via the configured Cloudflare secrets.
 
 ---
 
