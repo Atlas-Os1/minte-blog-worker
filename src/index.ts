@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import { marked } from 'marked';
 import { cors } from 'hono/cors';
-import { generateBlogPost, publishPost } from './manual-blog-gen';
+import { generateBlogPost, generateMemoryDigestPost, publishPost } from './manual-blog-gen';
 
 type Bindings = {
 	BLOG_BUCKET: R2Bucket;
@@ -85,6 +85,8 @@ type BlogPost = {
 	content: string;
 	draft: boolean;
 	category?: string;
+	heroImage?: string;
+	assets?: string[];
 };
 
 type PostIndex = {
@@ -314,6 +316,109 @@ function addHeadingIds(html: string): string {
 
 function renderTags(tags: string[]): string {
 	return tags.map((tag) => `<a href="/tags/${encodeURIComponent(tag)}" class="tag" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</a>`).join('');
+}
+
+
+function assetContentType(path: string): string {
+	const cleanPath = path.split('?')[0].toLowerCase();
+	const ext = cleanPath.slice(cleanPath.lastIndexOf('.'));
+	const map: Record<string, string> = {
+		'.avif': 'image/avif',
+		'.css': 'text/css; charset=utf-8',
+		'.gif': 'image/gif',
+		'.htm': 'text/html; charset=utf-8',
+		'.html': 'text/html; charset=utf-8',
+		'.jpeg': 'image/jpeg',
+		'.jpg': 'image/jpeg',
+		'.js': 'text/javascript; charset=utf-8',
+		'.json': 'application/json; charset=utf-8',
+		'.mp4': 'video/mp4',
+		'.png': 'image/png',
+		'.svg': 'image/svg+xml; charset=utf-8',
+		'.txt': 'text/plain; charset=utf-8',
+		'.webm': 'video/webm',
+		'.webp': 'image/webp',
+	};
+	return map[ext] || 'application/octet-stream';
+}
+
+function assetKind(path: string): 'image' | 'video' | 'embed' | 'file' {
+	const type = assetContentType(path);
+	if (type.startsWith('image/')) return 'image';
+	if (type.startsWith('video/')) return 'video';
+	if (type.startsWith('text/html')) return 'embed';
+	return 'file';
+}
+
+function normalizeAssetRef(ref: string, slug: string): string | null {
+	const cleaned = ref.trim().replace(/[),.;]+$/, '');
+	if (cleaned.startsWith('/assets/posts/')) return cleaned;
+	try {
+		const url = new URL(cleaned);
+		if (url.hostname === 'blog.minte.dev' && url.pathname.startsWith('/assets/posts/')) return url.pathname;
+	} catch {
+		// Not an absolute URL.
+	}
+	if (/^[\w./ -]+\.(svg|png|jpe?g|gif|webp|avif|mp4|webm|html?)$/i.test(cleaned) && !cleaned.includes('..')) {
+		return `/assets/posts/${slug}/${cleaned.replace(/^\.\//, '')}`;
+	}
+	return null;
+}
+
+function collectAssetRefs(post: BlogPost): string[] {
+	const refs = new Set<string>();
+	if (post.heroImage) {
+		const ref = normalizeAssetRef(post.heroImage, post.slug);
+		if (ref) refs.add(ref);
+	}
+	for (const asset of post.assets || []) {
+		const ref = normalizeAssetRef(asset, post.slug);
+		if (ref) refs.add(ref);
+	}
+	const content = post.content || '';
+	const patterns = [
+		/(?:src|href)=["']([^"']+)["']/g,
+		/\((\/assets\/posts\/[^\s\)"']+)\)/g,
+		/(https:\/\/blog\.minte\.dev\/assets\/posts\/[^\s`"'<>]+)/g,
+	];
+	for (const pattern of patterns) {
+		for (const match of content.matchAll(pattern)) {
+			const ref = normalizeAssetRef(match[1], post.slug);
+			if (ref) refs.add(ref);
+		}
+	}
+	return Array.from(refs).filter((ref) => ref.startsWith(`/assets/posts/${post.slug}/`));
+}
+
+function renderAssetGallery(post: BlogPost): string {
+	const refs = collectAssetRefs(post);
+	if (refs.length === 0) return '';
+	return `
+		<section class="asset-gallery" aria-label="Post asset bundle">
+			<div class="section-heading compact">
+				<div>
+					<p class="eyebrow">Attachment bundle</p>
+					<h2>Assets referenced by this build note</h2>
+				</div>
+				<p>Images, diagrams, video clips, and other files are served from the post's R2 asset bundle.</p>
+			</div>
+			<div class="asset-grid">
+				${refs.map((ref) => {
+					const kind = assetKind(ref);
+					const label = decodeURIComponent(ref.split('/').pop() || ref);
+					if (kind === 'image') {
+						return `<figure class="asset-card"><a href="${ref}" target="_blank" rel="noopener"><img src="${ref}" loading="lazy" alt="${escapeHtml(label)}"></a><figcaption>${escapeHtml(label)}</figcaption></figure>`;
+					}
+					if (kind === 'video') {
+						return `<figure class="asset-card"><video controls preload="metadata" playsinline src="${ref}"></video><figcaption><a href="${ref}" target="_blank" rel="noopener">${escapeHtml(label)}</a></figcaption></figure>`;
+					}
+					if (kind === 'embed') {
+						return `<figure class="asset-card wide"><iframe src="${ref}" loading="lazy" title="${escapeHtml(label)}"></iframe><figcaption><a href="${ref}" target="_blank" rel="noopener">${escapeHtml(label)}</a></figcaption></figure>`;
+					}
+					return `<a class="asset-card asset-file" href="${ref}" target="_blank" rel="noopener"><strong>${escapeHtml(label)}</strong><span>Open attachment →</span></a>`;
+				}).join('')}
+			</div>
+		</section>`;
 }
 
 function renderProjectCard(project: ProjectLink, compact = false): string {
@@ -595,6 +700,16 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.post-content iframe { width: 100%; min-height: min(76vh, 720px); border: 1px solid var(--border); border-radius: 22px; background: var(--bg-secondary); box-shadow: 0 16px 50px rgba(15,23,42,.12); }
 		.post-content .interactive-embed { margin: 32px 0; }
 		.post-content .interactive-embed iframe { display: block; aspect-ratio: 16 / 10; min-height: 460px; }
+		.post-content img, .post-content video, .asset-card img, .asset-card video { display: block; width: 100%; max-width: 100%; height: auto; }
+		.post-content video { border-radius: 18px; margin: 24px 0; background: #000; box-shadow: 0 16px 50px rgba(15,23,42,.12); }
+		.asset-gallery { margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--border); }
+		.section-heading.compact { align-items: start; }
+		.asset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
+		.asset-card { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface-strong); box-shadow: 0 12px 34px rgba(15,23,42,.08); }
+		.asset-card.wide { grid-column: 1 / -1; }
+		.asset-card iframe { width: 100%; min-height: min(72vh, 620px); border: 0; border-radius: 16px; background: var(--bg-secondary); }
+		.asset-card figcaption, .asset-file span { color: var(--text-secondary); font-size: .88rem; margin-top: 8px; overflow-wrap: anywhere; }
+		.asset-file { display: grid; gap: 8px; color: var(--text-primary); text-decoration: none; }
 		pre { background: var(--code-bg); padding: 18px; border-radius: 18px; overflow-x: auto; margin: 22px 0; }
 		code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace; font-size: .92rem; }
 		.toc-stack { position: sticky; top: 96px; display: grid; gap: 16px; }
@@ -611,7 +726,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.footer a { display: block; color: var(--text-secondary); margin: 7px 0; }
 		.footer a:hover { color: var(--accent); }
 		@media (max-width: 980px) { .hero-grid, .article-layout, .footer-grid { grid-template-columns: 1fr; } .toc-stack { position: static; } .controls { grid-template-columns: 1fr; } }
-		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { align-items: flex-start; border-radius: 22px; flex-direction: column; } .nav-links { justify-content: flex-start; } .hero, .article-shell { border-radius: 24px; } .section-heading { align-items: start; flex-direction: column; } .card-preview { grid-template-columns: repeat(2, 1fr); } }
+		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { position: static; align-items: flex-start; border-radius: 22px; flex-direction: column; } .brand-name { font-size: 1.1rem; } .nav-links { width: 100%; justify-content: flex-start; gap: 4px; } .nav a:not(.brand) { padding: 7px 9px; font-size: .84rem; } .theme-toggle { right: 14px; bottom: 14px; width: 42px; height: 42px; } .hero, .article-shell { border-radius: 24px; padding: 22px; } .hero-actions, .post-actions, .pager { align-items: stretch; flex-direction: column; } .btn, .share-link { width: 100%; justify-content: center; text-align: center; } .section-heading { align-items: start; flex-direction: column; } .post-card-topline, .post-card-footer, .article-meta { align-items: flex-start; flex-direction: column; gap: 8px; } .card-preview { grid-template-columns: repeat(2, 1fr); } .post-content { font-size: 1rem; } .post-content .interactive-embed iframe, .asset-card iframe { min-height: 320px; } .asset-grid { grid-template-columns: 1fr; } pre { margin-inline: -8px; border-radius: 14px; } }
 	</style>
 </head>
 <body>
@@ -1014,6 +1129,7 @@ app.get('/posts/:slug', async (c) => {
 
 	const contentWithoutH1 = stripLeadingH1(post.content, post.title);
 	const htmlContent = addHeadingIds(await marked(contentWithoutH1));
+	const assetGallery = renderAssetGallery(post);
 	const toc = buildTableOfContents(contentWithoutH1);
 	const project = inferProject(post);
 	const readingTime = estimateReadingTime(post.content, (post as any).readingTime);
@@ -1073,6 +1189,7 @@ app.get('/posts/:slug', async (c) => {
 				<div class="post-content">
 					${htmlContent}
 				</div>
+				${assetGallery}
 				${relatedHtml}
 				<nav class="pager" aria-label="Post navigation">
 					${previousPost ? `<a class="btn" href="/posts/${previousPost.slug}">← ${escapeHtml(previousPost.title)}</a>` : '<span></span>'}
@@ -1271,7 +1388,26 @@ app.get('/api/posts/:slug', async (c) => {
 // Assets route: Serve static files from R2 assets/ folder
 app.get('/assets/*', async (c) => {
 	const path = c.req.path.replace('/assets/', 'assets/');
-	const object = await c.env.BLOG_BUCKET.get(path);
+	const rangeHeader = c.req.header('Range');
+	let object: R2ObjectBody | null = null;
+	let range: { offset: number; length?: number } | undefined;
+
+	if (rangeHeader) {
+		const head = await c.env.BLOG_BUCKET.head(path);
+		const size = head?.size ?? 0;
+		const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+		if (match && size > 0) {
+			const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2] || 0));
+			const end = match[2] ? Number(match[2]) : size - 1;
+			if (Number.isFinite(start) && Number.isFinite(end) && start <= end && start < size) {
+				range = { offset: start, length: Math.min(end, size - 1) - start + 1 };
+				object = await c.env.BLOG_BUCKET.get(path, { range });
+			}
+		}
+		if (!object) return c.text('Range Not Satisfiable', 416, { 'Content-Range': `bytes */${size}` });
+	} else {
+		object = await c.env.BLOG_BUCKET.get(path);
+	}
 
 	if (!object) {
 		return c.notFound();
@@ -1279,8 +1415,20 @@ app.get('/assets/*', async (c) => {
 
 	const headers = new Headers();
 	object.writeHttpMetadata(headers);
-	headers.set('Cache-Control', 'public, max-age=31536000'); // 1 year cache for assets
+	if (!headers.has('Content-Type')) headers.set('Content-Type', assetContentType(path));
+	headers.set('Accept-Ranges', 'bytes');
+	headers.set('Cache-Control', 'public, max-age=31536000, immutable');
 
+	if (range) {
+		const size = object.size;
+		const offset = range.offset;
+		const length = range.length ?? Math.max(0, size - offset);
+		headers.set('Content-Length', String(length));
+		headers.set('Content-Range', `bytes ${offset}-${offset + length - 1}/${size}`);
+		return new Response(object.body, { status: 206, headers });
+	}
+
+	headers.set('Content-Length', String(object.size));
 	return new Response(object.body, {
 		headers,
 	});
@@ -1356,8 +1504,9 @@ app.post('/admin/generate-blog', async (c) => {
 	}
 
 	try {
-		// Generate blog post
+		// Generate public build note and protected memory digest
 		const post = await generateBlogPost(c.env.BLOG_BUCKET);
+		const memoryPost = await generateMemoryDigestPost(c.env.BLOG_BUCKET);
 		
 		// Publish to R2 + update index + purge cache
 		const result = await publishPost(
@@ -1366,11 +1515,17 @@ app.post('/admin/generate-blog', async (c) => {
 			c.env.CF_ZONE_ID,
 			c.env.CLOUDFLARE_API_TOKEN
 		);
+		const memoryResult = await publishPost(
+			c.env.BLOG_BUCKET,
+			memoryPost,
+			c.env.CF_ZONE_ID,
+			c.env.CLOUDFLARE_API_TOKEN
+		);
 		
-		if (!result.success) {
+		if (!result.success || !memoryResult.success) {
 			return c.json({ 
 				error: 'Blog publish failed', 
-				details: result.error 
+				details: result.error || memoryResult.error
 			}, 500);
 		}
 		
@@ -1378,6 +1533,7 @@ app.post('/admin/generate-blog', async (c) => {
 			success: true, 
 			message: 'Blog post generated and published',
 			url: result.url,
+			memoryUrl: memoryResult.url,
 			title: post.title,
 			slug: post.slug
 		});
@@ -1402,8 +1558,9 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (event
 	console.log('[Daily Blog] Cron triggered at', new Date().toISOString());
 	
 	try {
-		// Generate blog post from yesterday's memory
+		// Generate public build note and protected memory digest from yesterday's shared memory
 		const post = await generateBlogPost(env.BLOG_BUCKET, env.GITHUB_TOKEN);
+		const memoryPost = await generateMemoryDigestPost(env.BLOG_BUCKET);
 		
 		// Publish to R2 + update index + purge cache
 		const result = await publishPost(
@@ -1412,12 +1569,19 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (event
 			env.CF_ZONE_ID,
 			env.CLOUDFLARE_API_TOKEN
 		);
+		const memoryResult = await publishPost(
+			env.BLOG_BUCKET,
+			memoryPost,
+			env.CF_ZONE_ID,
+			env.CLOUDFLARE_API_TOKEN
+		);
 		
-		if (result.success) {
+		if (result.success && memoryResult.success) {
 			console.log('[Daily Blog] ✅ Published:', result.url);
+			console.log('[Daily Blog] ✅ Memory digest:', memoryResult.url);
 			console.log('[Daily Blog] Title:', post.title);
 		} else {
-			console.error('[Daily Blog] ❌ Failed:', result.error);
+			console.error('[Daily Blog] ❌ Failed:', result.error || memoryResult.error);
 		}
 	} catch (error) {
 		console.error('[Daily Blog] Error:', error instanceof Error ? error.message : String(error));
