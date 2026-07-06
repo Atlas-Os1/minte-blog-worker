@@ -177,7 +177,7 @@ const TOOL_LINKS: ToolLink[] = [
 		description: 'Code workflow slot reserved while the referral link is finalized.',
 		url: 'https://photon.codes/',
 		logo: 'PC',
-		logoUrl: 'https://photon.codes/favicon.ico',
+		logoUrl: 'https://app.photon.codes/icon0.svg?icon0.38661a6d.svg',
 		accent: '#f97316',
 		status: 'Referral link coming soon',
 	},
