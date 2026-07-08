@@ -123,6 +123,7 @@ type PhotonReferral = {
 	id: string;
 	createdAt: string;
 	status: 'new' | 'reviewed' | 'submitted' | 'confirmed' | 'rejected';
+	statusUpdatedAt?: string;
 	businessName: string;
 	contactName: string;
 	email: string;
@@ -132,6 +133,29 @@ type PhotonReferral = {
 	marketingConsent: boolean;
 	source: 'photon-referral-form';
 };
+
+const PHOTON_REFERRAL_STATUSES: PhotonReferral['status'][] = ['new', 'reviewed', 'submitted', 'confirmed', 'rejected'];
+const PHOTON_REFERRAL_PREFIX = 'referrals/photon/';
+const PHOTON_ADMIN_COOKIE = 'photon_admin';
+
+function isPhotonReferralStatus(value: string): value is PhotonReferral['status'] {
+	return PHOTON_REFERRAL_STATUSES.includes(value as PhotonReferral['status']);
+}
+
+function getPhotonAdminToken(c: { req: { header: (name: string) => string | undefined; query: (name: string) => string | undefined } }): string | undefined {
+	const authHeader = c.req.header('Authorization') || '';
+	const bearerToken = authHeader.match(/^Bearer\s+(.+)$/i)?.[1];
+	const cookieToken = getCookie(c.req.header('Cookie'), PHOTON_ADMIN_COOKIE);
+	return bearerToken || c.req.query('token') || (cookieToken ? decodeURIComponent(cookieToken) : undefined);
+}
+
+function isPhotonAdminAuthorized(c: { req: { header: (name: string) => string | undefined; query: (name: string) => string | undefined } }, env: { ADMIN_TOKEN?: string }): boolean {
+	return Boolean(env.ADMIN_TOKEN && getPhotonAdminToken(c) === env.ADMIN_TOKEN);
+}
+
+function buildPhotonAdminCookie(token: string, secure: boolean): string {
+	return `${PHOTON_ADMIN_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${secure ? '; Secure' : ''}`;
+}
 
 const MINTE_FAVICON_URL = 'https://pub-0be86ba29d2f4e66b59fe97deb2ea9d3.r2.dev/assets/favicon.png';
 
@@ -302,36 +326,23 @@ function buildPhotonReferralId(businessName: string): string {
 	return `${new Date().toISOString().replace(/[:.]/g, '-')}-${slugify(businessName)}`;
 }
 
-function buildPhotonReferralSummary(referral: PhotonReferral): string {
+function buildPhotonReferralSummary(referral: PhotonReferral, extraLines: string[] = []): string {
 	const notes = referral.notes ? referral.notes.slice(0, 800) : 'No notes provided.';
 	return [
-		`New Photon referral intake: ${referral.businessName}`,
+		`Business: ${referral.businessName}`,
 		`Contact: ${referral.contactName} <${referral.email}>`,
 		referral.phone ? `Phone: ${referral.phone}` : null,
 		referral.companySize ? `Company size: ${referral.companySize}` : null,
+		`Status: ${referral.status}`,
+		referral.statusUpdatedAt ? `Status updated: ${new Date(referral.statusUpdatedAt).toLocaleString()}` : null,
 		`Consent: ${referral.marketingConsent ? 'yes' : 'no'}`,
 		`Notes: ${notes}`,
-		`Admin queue: https://blog.minte.dev/admin/photon-referrals`,
+		...extraLines,
 	].filter(Boolean).join('\n');
 }
 
-async function notifyPhotonReferral(referral: PhotonReferral, env: Bindings): Promise<void> {
+async function sendPhotonReferralDiscordNotification(env: Bindings, payload: Record<string, unknown>): Promise<void> {
 	if (!env.DISCORD_WEBHOOK_URL) return;
-	const summary = buildPhotonReferralSummary(referral);
-	const payload = {
-		content: `📣 New Photon referral intake: **${referral.businessName}**`,
-		embeds: [{
-			title: 'Photon referral submitted',
-			description: summary,
-			color: 0xf97316,
-			fields: [
-				{ name: 'Business', value: referral.businessName.slice(0, 1024), inline: true },
-				{ name: 'Contact', value: referral.contactName.slice(0, 1024), inline: true },
-				{ name: 'Email', value: referral.email.slice(0, 1024), inline: true },
-			],
-			timestamp: referral.createdAt,
-		}],
-	};
 	try {
 		const response = await fetch(env.DISCORD_WEBHOOK_URL, {
 			method: 'POST',
@@ -344,6 +355,51 @@ async function notifyPhotonReferral(referral: PhotonReferral, env: Bindings): Pr
 	} catch (error) {
 		console.warn('[Photon Referral] Discord notification error:', error instanceof Error ? error.message : String(error));
 	}
+}
+
+async function notifyPhotonReferral(referral: PhotonReferral, env: Bindings): Promise<void> {
+	const summary = buildPhotonReferralSummary(referral, ['Admin queue: https://blog.minte.dev/admin/photon-referrals']);
+	await sendPhotonReferralDiscordNotification(env, {
+		content: `📣 **Photon referral received:** ${referral.businessName}`,
+		allowed_mentions: { parse: [] },
+		embeds: [{
+			title: 'Photon referral submitted',
+			description: summary,
+			color: 0xf97316,
+			fields: [
+				{ name: 'Business', value: referral.businessName.slice(0, 1024), inline: true },
+				{ name: 'Contact', value: referral.contactName.slice(0, 1024), inline: true },
+				{ name: 'Email', value: referral.email.slice(0, 1024), inline: true },
+			],
+			timestamp: referral.createdAt,
+			footer: { text: 'Minte Blog · Photon intake' },
+		}],
+	});
+}
+
+async function notifyPhotonReferralStatusChange(referral: PhotonReferral, env: Bindings, previousStatus: PhotonReferral['status']): Promise<void> {
+	const headline = `Photon referral marked ${referral.status}`;
+	const summary = buildPhotonReferralSummary(referral, [
+		`Previous status: ${previousStatus}`,
+		`Admin queue: https://blog.minte.dev/admin/photon-referrals`,
+	]);
+	await sendPhotonReferralDiscordNotification(env, {
+		content: `🔁 **Photon referral status updated:** ${referral.businessName} → ${referral.status}`,
+		allowed_mentions: { parse: [] },
+		embeds: [{
+			title: headline,
+			description: summary,
+			color: referral.status === 'confirmed' ? 0x22c55e : referral.status === 'rejected' ? 0xef4444 : referral.status === 'submitted' ? 0x3b82f6 : referral.status === 'reviewed' ? 0xa855f7 : 0xf97316,
+			fields: [
+				{ name: 'Business', value: referral.businessName.slice(0, 1024), inline: true },
+				{ name: 'Contact', value: referral.contactName.slice(0, 1024), inline: true },
+				{ name: 'Email', value: referral.email.slice(0, 1024), inline: true },
+				{ name: 'Status', value: referral.status, inline: true },
+			],
+			timestamp: referral.statusUpdatedAt || referral.createdAt,
+			footer: { text: 'Minte Blog · Photon admin' },
+		}],
+	});
 }
 
 function renderPhotonReferralForm(values: Partial<PhotonReferral> = {}, error?: string): string {
@@ -444,11 +500,30 @@ function renderPhotonReferralAdmin(referrals: PhotonReferral[]): string {
 	const rows = referrals.map((referral) => `
 		<tr>
 			<td>${escapeHtml(new Date(referral.createdAt).toLocaleString())}</td>
-			<td><strong>${escapeHtml(referral.businessName)}</strong><div style="color: var(--text-secondary); font-size: .88rem;">${escapeHtml(referral.companySize || 'Not provided')}</div></td>
-			<td>${escapeHtml(referral.contactName)}<div style="color: var(--text-secondary); font-size: .88rem;">${escapeHtml(referral.email)}</div></td>
+			<td>
+				<strong>${escapeHtml(referral.businessName)}</strong>
+				<div style="color: var(--text-secondary); font-size: .88rem;">${escapeHtml(referral.companySize || 'Not provided')}</div>
+			</td>
+			<td>
+				${escapeHtml(referral.contactName)}
+				<div style="color: var(--text-secondary); font-size: .88rem;">${escapeHtml(referral.email)}</div>
+			</td>
 			<td>${escapeHtml(referral.phone || '—')}</td>
 			<td>${escapeHtml(referral.notes || '—')}</td>
-			<td><span class="tag">${escapeHtml(referral.status)}</span></td>
+			<td>
+				<div class="admin-status-stack">
+					<span class="tag">${escapeHtml(referral.status)}</span>
+					${referral.statusUpdatedAt ? `<small>Updated ${escapeHtml(new Date(referral.statusUpdatedAt).toLocaleString())}</small>` : ''}
+				</div>
+			</td>
+			<td>
+				<form class="admin-status-form" method="post" action="/admin/photon-referrals/${encodeURIComponent(referral.id)}/status">
+					<select name="status" aria-label="Update status for ${escapeHtml(referral.businessName)}">
+						${PHOTON_REFERRAL_STATUSES.map((status) => `<option value="${status}" ${referral.status === status ? 'selected' : ''}>${status}</option>`).join('')}
+					</select>
+					<button class="btn" type="submit">Save</button>
+				</form>
+			</td>
 		</tr>
 	`).join('');
 	return `
@@ -464,10 +539,10 @@ function renderPhotonReferralAdmin(referrals: PhotonReferral[]): string {
 				<table class="referral-table">
 					<thead>
 						<tr>
-							<th>Created</th><th>Business</th><th>Contact</th><th>Phone</th><th>Notes</th><th>Status</th>
+							<th>Created</th><th>Business</th><th>Contact</th><th>Phone</th><th>Notes</th><th>Status</th><th>Action</th>
 						</tr>
 					</thead>
-					<tbody>${rows || '<tr><td colspan="6">No referrals yet.</td></tr>'}</tbody>
+					<tbody>${rows || '<tr><td colspan="7">No referrals yet.</td></tr>'}</tbody>
 				</table>
 			</div>
 		</section>
@@ -475,7 +550,7 @@ function renderPhotonReferralAdmin(referrals: PhotonReferral[]): string {
 }
 
 async function loadPhotonReferrals(bucket: R2Bucket, limit = 25): Promise<PhotonReferral[]> {
-	const listed = await bucket.list({ prefix: 'referrals/photon/', limit });
+	const listed = await bucket.list({ prefix: PHOTON_REFERRAL_PREFIX, limit });
 	const referrals = await Promise.all(listed.objects.map(async (object) => {
 		try {
 			const file = await bucket.get(object.key);
@@ -487,6 +562,36 @@ async function loadPhotonReferrals(bucket: R2Bucket, limit = 25): Promise<Photon
 	}));
 	return referrals.filter((referral): referral is PhotonReferral => Boolean(referral))
 		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+function photonReferralKey(id: string): string {
+	return `${PHOTON_REFERRAL_PREFIX}${id}.json`;
+}
+
+async function loadPhotonReferral(bucket: R2Bucket, id: string): Promise<PhotonReferral | null> {
+	const file = await bucket.get(photonReferralKey(id));
+	if (!file) return null;
+	try {
+		return JSON.parse(await file.text()) as PhotonReferral;
+	} catch {
+		return null;
+	}
+}
+
+async function savePhotonReferral(bucket: R2Bucket, referral: PhotonReferral): Promise<void> {
+	await bucket.put(photonReferralKey(referral.id), JSON.stringify(referral, null, 2), {
+		httpMetadata: { contentType: 'application/json' },
+	});
+}
+
+async function updatePhotonReferralStatus(bucket: R2Bucket, id: string, status: PhotonReferral['status']): Promise<{ referral: PhotonReferral | null; previousStatus?: PhotonReferral['status'] }> {
+	const referral = await loadPhotonReferral(bucket, id);
+	if (!referral) return { referral: null };
+	const previousStatus = referral.status;
+	referral.status = status;
+	referral.statusUpdatedAt = new Date().toISOString();
+	await savePhotonReferral(bucket, referral);
+	return { referral, previousStatus };
 }
 
 function inferProject(post: Omit<BlogPost, 'content'> | BlogPost): ProjectLink {
@@ -963,6 +1068,11 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.referral-table { width: 100%; border-collapse: collapse; min-width: 900px; }
 		.referral-table th, .referral-table td { text-align: left; vertical-align: top; padding: 14px 12px; border-bottom: 1px solid var(--border); }
 		.referral-table th { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary); }
+		.admin-status-stack { display: grid; gap: 6px; }
+		.admin-status-stack small { color: var(--text-secondary); font-size: .78rem; }
+		.admin-status-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+		.admin-status-form select { min-height: 40px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-strong); color: var(--text-primary); font: inherit; }
+		.admin-status-form .btn { min-height: 40px; padding: 8px 12px; }
 		pre { background: var(--code-bg); padding: 18px; border-radius: 18px; overflow-x: auto; margin: 22px 0; }
 		code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace; font-size: .92rem; }
 		.toc-stack { position: sticky; top: 96px; display: grid; gap: 16px; }
@@ -1872,25 +1982,45 @@ app.post('/photon-referral', async (c) => {
 		source: 'photon-referral-form',
 	};
 
-	await c.env.BLOG_BUCKET.put(
-		`referrals/photon/${referral.id}.json`,
-		JSON.stringify(referral, null, 2),
-		{ httpMetadata: { contentType: 'application/json' } }
-	);
-
+	await savePhotonReferral(c.env.BLOG_BUCKET, referral);
 	await notifyPhotonReferral(referral, c.env);
 
 	return c.html(renderPage('Photon Referral Saved', renderPhotonReferralSuccess(referral)));
 });
 
 app.get('/admin/photon-referrals', async (c) => {
-	const authHeader = c.req.header('Authorization');
-	if (!c.env.ADMIN_TOKEN || !authHeader || authHeader !== `Bearer ${c.env.ADMIN_TOKEN}`) {
+	const queryToken = c.req.query('token');
+	if (!isPhotonAdminAuthorized(c, c.env)) {
 		return c.json({ error: 'Unauthorized' }, 401);
 	}
 
 	const referrals = await loadPhotonReferrals(c.env.BLOG_BUCKET);
-	return c.html(renderPage('Photon Referrals', renderPhotonReferralAdmin(referrals)));
+	const response = c.html(renderPage('Photon Referrals', renderPhotonReferralAdmin(referrals)));
+	if (queryToken && queryToken === c.env.ADMIN_TOKEN) {
+		response.headers.append('Set-Cookie', buildPhotonAdminCookie(queryToken, new URL(c.req.url).protocol === 'https:'));
+	}
+	return response;
+});
+
+app.post('/admin/photon-referrals/:id/status', async (c) => {
+	if (!isPhotonAdminAuthorized(c, c.env)) {
+		return c.json({ error: 'Unauthorized' }, 401);
+	}
+
+	const id = c.req.param('id');
+	const formData = await c.req.formData();
+	const statusValue = readFormValue(formData, 'status');
+	if (!isPhotonReferralStatus(statusValue)) {
+		return c.html(renderPage('Photon Referrals', '<section class="section"><h1>Invalid status</h1><p>Status must be new, reviewed, submitted, confirmed, or rejected.</p></section>'), 400);
+	}
+
+	const { referral, previousStatus } = await updatePhotonReferralStatus(c.env.BLOG_BUCKET, id, statusValue);
+	if (!referral) {
+		return c.json({ error: 'Referral not found' }, 404);
+	}
+
+	await notifyPhotonReferralStatusChange(referral, c.env, previousStatus || 'new');
+	return c.redirect('/admin/photon-referrals', 303);
 });
 
 // 404 handler
