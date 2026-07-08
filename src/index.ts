@@ -12,6 +12,7 @@ type Bindings = {
 	CLOUDFLARE_API_TOKEN: string;
 	GITHUB_TOKEN: string;
 	ADMIN_TOKEN?: string; // Bearer token for admin endpoints
+	DISCORD_WEBHOOK_URL?: string; // Optional Discord webhook for referral notifications
 	MEMORY_PASSWORD?: string; // Optional gate for legacy/private memory archive
 };
 
@@ -114,6 +115,8 @@ type ToolLink = {
 	logoUrl?: string;
 	accent: string;
 	status?: string;
+	secondaryLabel?: string;
+	secondaryUrl?: string;
 };
 
 type PhotonReferral = {
@@ -196,6 +199,8 @@ const TOOL_LINKS: ToolLink[] = [
 		logoUrl: 'https://app.photon.codes/icon0.svg?icon0.38661a6d.svg',
 		accent: '#f97316',
 		status: 'Referral intake live',
+		secondaryLabel: 'Referral form',
+		secondaryUrl: '/photon-referral',
 	},
 	{
 		slug: 'cloudflare',
@@ -295,6 +300,50 @@ function readFormValue(formData: FormData, name: string): string {
 
 function buildPhotonReferralId(businessName: string): string {
 	return `${new Date().toISOString().replace(/[:.]/g, '-')}-${slugify(businessName)}`;
+}
+
+function buildPhotonReferralSummary(referral: PhotonReferral): string {
+	const notes = referral.notes ? referral.notes.slice(0, 800) : 'No notes provided.';
+	return [
+		`New Photon referral intake: ${referral.businessName}`,
+		`Contact: ${referral.contactName} <${referral.email}>`,
+		referral.phone ? `Phone: ${referral.phone}` : null,
+		referral.companySize ? `Company size: ${referral.companySize}` : null,
+		`Consent: ${referral.marketingConsent ? 'yes' : 'no'}`,
+		`Notes: ${notes}`,
+		`Admin queue: https://blog.minte.dev/admin/photon-referrals`,
+	].filter(Boolean).join('\n');
+}
+
+async function notifyPhotonReferral(referral: PhotonReferral, env: Bindings): Promise<void> {
+	if (!env.DISCORD_WEBHOOK_URL) return;
+	const summary = buildPhotonReferralSummary(referral);
+	const payload = {
+		content: `📣 New Photon referral intake: **${referral.businessName}**`,
+		embeds: [{
+			title: 'Photon referral submitted',
+			description: summary,
+			color: 0xf97316,
+			fields: [
+				{ name: 'Business', value: referral.businessName.slice(0, 1024), inline: true },
+				{ name: 'Contact', value: referral.contactName.slice(0, 1024), inline: true },
+				{ name: 'Email', value: referral.email.slice(0, 1024), inline: true },
+			],
+			timestamp: referral.createdAt,
+		}],
+	};
+	try {
+		const response = await fetch(env.DISCORD_WEBHOOK_URL, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+		});
+		if (!response.ok) {
+			console.warn('[Photon Referral] Discord notification failed:', response.status);
+		}
+	} catch (error) {
+		console.warn('[Photon Referral] Discord notification error:', error instanceof Error ? error.message : String(error));
+	}
 }
 
 function renderPhotonReferralForm(values: Partial<PhotonReferral> = {}, error?: string): string {
@@ -617,7 +666,7 @@ function renderProjectCard(project: ProjectLink, compact = false): string {
 
 function renderToolCard(tool: ToolLink): string {
 	return `
-		<a class="tool-card reveal-card" data-reveal-card href="${tool.url}" target="_blank" rel="noopener" style="--tool-accent: ${tool.accent}; --project-accent: ${tool.accent}">
+		<article class="tool-card reveal-card" data-reveal-card style="--tool-accent: ${tool.accent}; --project-accent: ${tool.accent}">
 			<div class="card-ambient" aria-hidden="true"></div>
 			<div class="tool-logo" aria-hidden="true">${tool.logoUrl ? `<img src="${tool.logoUrl}" alt="" loading="lazy" onerror="this.remove(); this.parentElement.textContent='${escapeHtml(tool.logo)}';">` : escapeHtml(tool.logo)}</div>
 			<div>
@@ -626,9 +675,15 @@ function renderToolCard(tool: ToolLink): string {
 					<span>↗</span>
 				</div>
 				<p>${escapeHtml(tool.description)}</p>
-				${tool.status ? `<span class="tool-status">${escapeHtml(tool.status)}</span>` : ''}
+				<div class="tool-actions-row">
+					${tool.status ? `<span class="tool-status">${escapeHtml(tool.status)}</span>` : ''}
+					<div class="tool-action-links">
+						<a href="${tool.url}" target="_blank" rel="noopener">Open</a>
+						${tool.secondaryUrl ? `<a href="${tool.secondaryUrl}" ${tool.secondaryUrl.startsWith('/') ? '' : 'target="_blank" rel="noopener"'}>${escapeHtml(tool.secondaryLabel || 'Open referral form')}</a>` : ''}
+					</div>
+				</div>
 			</div>
-		</a>`;
+		</article>`;
 }
 
 function renderPostCard(post: Omit<BlogPost, 'content'>): string {
@@ -817,7 +872,11 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.tool-logo img { width: 28px; height: 28px; border-radius: 7px; object-fit: contain; background: rgba(255,255,255,.92); padding: 3px; }
 		.tool-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 		.tool-card p { color: var(--text-secondary); margin-top: 7px; }
-		.tool-status { display: inline-flex; width: fit-content; margin-top: 12px; padding: 5px 9px; border-radius: 999px; color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent), transparent 86%); font-size: .78rem; font-weight: 800; }
+		.tool-actions-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+		.tool-action-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+		.tool-action-links a { display: inline-flex; align-items: center; justify-content: center; padding: 8px 11px; border-radius: 999px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface-strong), white 10%); color: var(--text-primary); font-size: .84rem; font-weight: 800; }
+		.tool-action-links a:hover { border-color: var(--tool-accent); color: var(--tool-accent); }
+		.tool-status { display: inline-flex; width: fit-content; padding: 5px 9px; border-radius: 999px; color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent), transparent 86%); font-size: .78rem; font-weight: 800; }
 		.controls { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 18px; }
 		.search-box { width: 100%; min-height: 48px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-strong); color: var(--text-primary); padding: 0 16px; font: inherit; }
 		.filter-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1818,6 +1877,8 @@ app.post('/photon-referral', async (c) => {
 		JSON.stringify(referral, null, 2),
 		{ httpMetadata: { contentType: 'application/json' } }
 	);
+
+	await notifyPhotonReferral(referral, c.env);
 
 	return c.html(renderPage('Photon Referral Saved', renderPhotonReferralSuccess(referral)));
 });
