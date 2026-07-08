@@ -116,6 +116,20 @@ type ToolLink = {
 	status?: string;
 };
 
+type PhotonReferral = {
+	id: string;
+	createdAt: string;
+	status: 'new' | 'reviewed' | 'submitted' | 'confirmed' | 'rejected';
+	businessName: string;
+	contactName: string;
+	email: string;
+	phone?: string;
+	companySize?: string;
+	notes?: string;
+	marketingConsent: boolean;
+	source: 'photon-referral-form';
+};
+
 const MINTE_FAVICON_URL = 'https://pub-0be86ba29d2f4e66b59fe97deb2ea9d3.r2.dev/assets/favicon.png';
 
 const PROJECTS: ProjectLink[] = [
@@ -176,12 +190,12 @@ const TOOL_LINKS: ToolLink[] = [
 	{
 		slug: 'photon-codes',
 		name: 'Photon Codes',
-		description: 'Code workflow slot reserved while the referral link is finalized.',
+		description: 'Code workflow slot reserved while the referral intake is handled on our side.',
 		url: 'https://photon.codes/',
 		logo: 'PC',
 		logoUrl: 'https://app.photon.codes/icon0.svg?icon0.38661a6d.svg',
 		accent: '#f97316',
-		status: 'Referral link coming soon',
+		status: 'Referral intake live',
 	},
 	{
 		slug: 'cloudflare',
@@ -268,6 +282,162 @@ function escapeHtml(value: string): string {
 
 function normalize(value: string): string {
 	return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function slugify(value: string): string {
+	return normalize(value || 'referral').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'referral';
+}
+
+function readFormValue(formData: FormData, name: string): string {
+	const value = formData.get(name);
+	return typeof value === 'string' ? value.trim() : '';
+}
+
+function buildPhotonReferralId(businessName: string): string {
+	return `${new Date().toISOString().replace(/[:.]/g, '-')}-${slugify(businessName)}`;
+}
+
+function renderPhotonReferralForm(values: Partial<PhotonReferral> = {}, error?: string): string {
+	return `
+		<section class="hero">
+			<div class="hero-grid">
+				<div>
+					<p class="eyebrow">Photon referral intake</p>
+					<h1>Refer a business for Photon’s 15% offer.</h1>
+					<p class="lede">Photon’s referral flow is submitted, then confirmed by their team. We collect the lead here, review it, and then submit it to Photon for you.</p>
+					<div class="hero-actions">
+						<a class="btn primary" href="#photon-referral-form">Submit referral</a>
+						<a class="btn" href="https://refer.photon.codes/" target="_blank" rel="noopener">Photon referral terms</a>
+					</div>
+				</div>
+				<div class="hero-panel">
+					<div class="metric"><span>Business gets</span><strong>15% off first month</strong></div>
+					<div class="metric"><span>You earn</span><strong>15% for 12 months</strong></div>
+					<div class="metric"><span>Photon asks for</span><strong>company name + who to talk to</strong></div>
+					<div class="metric"><span>Status</span><strong>Reviewed before submission</strong></div>
+				</div>
+			</div>
+		</section>
+		<section class="section" id="photon-referral-form">
+			<div class="section-heading">
+				<div>
+					<p class="eyebrow">Intake form</p>
+					<h2>Send us the business details</h2>
+				</div>
+				<p>We’ll review the lead and submit it to Photon manually, so the intro stays accurate and consented.</p>
+			</div>
+			${error ? `<div class="form-alert error">${escapeHtml(error)}</div>` : ''}
+			<form class="referral-form" method="post" action="/photon-referral">
+				<label>
+					<span>Business name *</span>
+					<input name="businessName" required value="${escapeHtml(values.businessName || '')}" placeholder="Company or shop name">
+				</label>
+				<label>
+					<span>Contact person *</span>
+					<input name="contactName" required value="${escapeHtml(values.contactName || '')}" placeholder="Who we should talk to">
+				</label>
+				<label>
+					<span>Email *</span>
+					<input name="email" type="email" required value="${escapeHtml(values.email || '')}" placeholder="name@company.com">
+				</label>
+				<label>
+					<span>Phone</span>
+					<input name="phone" type="tel" value="${escapeHtml(values.phone || '')}" placeholder="Optional">
+				</label>
+				<label>
+					<span>Business size</span>
+					<select name="companySize">
+						${['1-10 employees', '11-50 employees', '51-200 employees', '200+ employees', 'Not sure'].map((option) => `<option value="${escapeHtml(option)}" ${values.companySize === option ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+					</select>
+				</label>
+				<label class="field-full">
+					<span>Notes / context</span>
+					<textarea name="notes" rows="6" placeholder="Why this business is a fit, the right contact, timing, etc.">${escapeHtml(values.notes || '')}</textarea>
+				</label>
+				<label class="field-full consent-row">
+					<input type="checkbox" name="marketingConsent" value="yes" ${values.marketingConsent ? 'checked' : ''} required>
+					<span>I confirm the business wants us to submit this referral to Photon and follow up about the offer.</span>
+				</label>
+				<div class="form-actions field-full">
+					<button class="btn primary" type="submit">Save referral</button>
+					<a class="btn" href="/">Back to blog</a>
+				</div>
+			</form>
+		</section>
+	`;
+}
+
+function renderPhotonReferralSuccess(referral: PhotonReferral): string {
+	return `
+		<section class="hero">
+			<div class="hero-grid">
+				<div>
+					<p class="eyebrow">Referral saved</p>
+					<h1>We’ve got it.</h1>
+					<p class="lede">We’ll review ${escapeHtml(referral.businessName)} and submit the referral to Photon using the contact details you provided.</p>
+					<div class="hero-actions">
+						<a class="btn primary" href="/photon-referral">Submit another</a>
+						<a class="btn" href="/">Back to blog</a>
+					</div>
+				</div>
+				<div class="hero-panel">
+					<div class="metric"><span>Business</span><strong>${escapeHtml(referral.businessName)}</strong></div>
+					<div class="metric"><span>Contact</span><strong>${escapeHtml(referral.contactName)}</strong></div>
+					<div class="metric"><span>Email</span><strong>${escapeHtml(referral.email)}</strong></div>
+					<div class="metric"><span>Status</span><strong>Queued for review</strong></div>
+				</div>
+			</div>
+		</section>
+	`;
+}
+
+function renderPhotonReferralAdmin(referrals: PhotonReferral[]): string {
+	const rows = referrals.map((referral) => `
+		<tr>
+			<td>${escapeHtml(new Date(referral.createdAt).toLocaleString())}</td>
+			<td><strong>${escapeHtml(referral.businessName)}</strong><div style="color: var(--text-secondary); font-size: .88rem;">${escapeHtml(referral.companySize || 'Not provided')}</div></td>
+			<td>${escapeHtml(referral.contactName)}<div style="color: var(--text-secondary); font-size: .88rem;">${escapeHtml(referral.email)}</div></td>
+			<td>${escapeHtml(referral.phone || '—')}</td>
+			<td>${escapeHtml(referral.notes || '—')}</td>
+			<td><span class="tag">${escapeHtml(referral.status)}</span></td>
+		</tr>
+	`).join('');
+	return `
+		<section class="section">
+			<div class="section-heading">
+				<div>
+					<p class="eyebrow">Admin review</p>
+					<h1>Photon referrals</h1>
+				</div>
+				<p>${referrals.length} referral(s) in queue.</p>
+			</div>
+			<div style="overflow-x:auto;">
+				<table class="referral-table">
+					<thead>
+						<tr>
+							<th>Created</th><th>Business</th><th>Contact</th><th>Phone</th><th>Notes</th><th>Status</th>
+						</tr>
+					</thead>
+					<tbody>${rows || '<tr><td colspan="6">No referrals yet.</td></tr>'}</tbody>
+				</table>
+			</div>
+		</section>
+	`;
+}
+
+async function loadPhotonReferrals(bucket: R2Bucket, limit = 25): Promise<PhotonReferral[]> {
+	const listed = await bucket.list({ prefix: 'referrals/photon/', limit });
+	const referrals = await Promise.all(listed.objects.map(async (object) => {
+		try {
+			const file = await bucket.get(object.key);
+			if (!file) return null;
+			return JSON.parse(await file.text()) as PhotonReferral;
+		} catch {
+			return null;
+		}
+	}));
+	return referrals.filter((referral): referral is PhotonReferral => Boolean(referral))
+		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 function inferProject(post: Omit<BlogPost, 'content'> | BlogPost): ProjectLink {
@@ -718,6 +888,22 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.asset-link-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 		.asset-link-card small { display: block; color: var(--text-secondary); font-size: .78rem; }
 		.asset-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: white; background: var(--accent); font-weight: 900; }
+		.referral-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 24px; border: 1px solid var(--border); border-radius: 28px; background: var(--surface); box-shadow: 0 16px 50px rgba(15,23,42,.08); }
+		.referral-form label { display: grid; gap: 8px; }
+		.referral-form span { font-weight: 700; color: var(--text-primary); }
+		.referral-form input, .referral-form textarea, .referral-form select { width: 100%; min-height: 48px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface-strong); color: var(--text-primary); font: inherit; }
+		.referral-form textarea { min-height: 140px; resize: vertical; }
+		.field-full { grid-column: 1 / -1; }
+		.consent-row { display: flex !important; align-items: flex-start; gap: 12px; }
+		.consent-row input { width: 20px; height: 20px; min-height: 20px; margin-top: 4px; }
+		.consent-row span { font-weight: 600; color: var(--text-secondary); }
+		.form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+		.form-alert { padding: 14px 16px; border-radius: 18px; margin-bottom: 14px; }
+		.form-alert.error { background: color-mix(in srgb, #ef4444, transparent 90%); border: 1px solid color-mix(in srgb, #ef4444, transparent 65%); color: #b91c1c; }
+		.form-alert.success { background: color-mix(in srgb, #16a34a, transparent 90%); border: 1px solid color-mix(in srgb, #16a34a, transparent 65%); color: #166534; }
+		.referral-table { width: 100%; border-collapse: collapse; min-width: 900px; }
+		.referral-table th, .referral-table td { text-align: left; vertical-align: top; padding: 14px 12px; border-bottom: 1px solid var(--border); }
+		.referral-table th { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary); }
 		pre { background: var(--code-bg); padding: 18px; border-radius: 18px; overflow-x: auto; margin: 22px 0; }
 		code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace; font-size: .92rem; }
 		.toc-stack { position: sticky; top: 96px; display: grid; gap: 16px; }
@@ -734,7 +920,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.footer a { display: block; color: var(--text-secondary); margin: 7px 0; }
 		.footer a:hover { color: var(--accent); }
 		@media (max-width: 980px) { .hero-grid, .article-layout, .footer-grid { grid-template-columns: 1fr; } .toc-stack { position: static; } .controls { grid-template-columns: 1fr; } }
-		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { position: static; align-items: flex-start; border-radius: 22px; flex-direction: column; } .brand-name { font-size: 1.1rem; } .nav-links { width: 100%; justify-content: flex-start; gap: 4px; } .nav a:not(.brand) { padding: 7px 9px; font-size: .84rem; } .theme-toggle { right: 14px; bottom: 14px; width: 42px; height: 42px; } .hero, .article-shell { border-radius: 24px; padding: 16px; } .hero-actions, .post-actions, .pager { align-items: stretch; flex-direction: column; } .btn, .share-link { width: 100%; justify-content: center; text-align: center; } .section-heading { align-items: start; flex-direction: column; } .post-card-topline, .post-card-footer, .article-meta { align-items: flex-start; flex-direction: column; gap: 8px; } .card-preview { grid-template-columns: repeat(2, 1fr); } .post-content { font-size: 1rem; } .wide-media-frame { margin-inline: -6px; padding: 8px; } .wide-media-frame .media-scroll img { width: 760px; max-width: none; } .wide-media-frame figcaption { font-size: .8rem; } .post-content .interactive-embed iframe { min-height: 320px; } .asset-link-grid { grid-template-columns: 1fr; } pre { max-width: 100%; margin-inline: -8px; border-radius: 14px; } code { overflow-wrap: anywhere; } }
+		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { position: static; align-items: flex-start; border-radius: 22px; flex-direction: column; } .brand-name { font-size: 1.1rem; } .nav-links { width: 100%; justify-content: flex-start; gap: 4px; } .nav a:not(.brand) { padding: 7px 9px; font-size: .84rem; } .theme-toggle { right: 14px; bottom: 14px; width: 42px; height: 42px; } .hero, .article-shell { border-radius: 24px; padding: 16px; } .hero-actions, .post-actions, .pager { align-items: stretch; flex-direction: column; } .btn, .share-link { width: 100%; justify-content: center; text-align: center; } .section-heading { align-items: start; flex-direction: column; } .post-card-topline, .post-card-footer, .article-meta { align-items: flex-start; flex-direction: column; gap: 8px; } .card-preview { grid-template-columns: repeat(2, 1fr); } .post-content { font-size: 1rem; } .wide-media-frame { margin-inline: -6px; padding: 8px; } .wide-media-frame .media-scroll img { width: 760px; max-width: none; } .wide-media-frame figcaption { font-size: .8rem; } .post-content .interactive-embed iframe { min-height: 320px; } .asset-link-grid { grid-template-columns: 1fr; } .referral-form { grid-template-columns: 1fr; padding: 18px; } .referral-table { min-width: 780px; } pre { max-width: 100%; margin-inline: -8px; border-radius: 14px; } code { overflow-wrap: anywhere; } }
 	</style>
 </head>
 <body>
@@ -1003,6 +1189,30 @@ app.get('/', async (c) => {
 				<p>A quick stack shelf for the products, developer platforms, and open repos powering Atlas / Minte projects. Photon is linked now and has a reserved referral spot for the final URL.</p>
 			</div>
 			<div class="tool-grid">${productStack}</div>
+		</section>
+
+		<section class="section" id="photon-referral-cta">
+			<div class="section-heading">
+				<div>
+					<p class="eyebrow">Photon referral</p>
+					<h2>Want 15% off Photon Spectrum?</h2>
+				</div>
+				<p>Send us the business details first. We’ll review the lead and submit it to Photon’s referral flow for you.</p>
+			</div>
+			<div class="project-grid">
+				<article class="project-card reveal-card compact" data-reveal-card style="--project-accent: #f97316">
+					<div class="card-ambient" aria-hidden="true"></div>
+					<div>
+						<p class="eyebrow">Photon referral</p>
+						<h3>Submit a business</h3>
+						<p>Photon’s current referral flow is a submission, not a public coupon code. We collect the intro, review it, then fill the Photon form ourselves.</p>
+					</div>
+					<div class="project-actions">
+						<a href="/photon-referral">Open intake form</a>
+						<a href="https://refer.photon.codes/" target="_blank" rel="noopener">Photon referral page</a>
+					</div>
+				</article>
+			</div>
 		</section>
 
 		<section class="section" id="posts">
@@ -1551,6 +1761,75 @@ app.post('/admin/generate-blog', async (c) => {
 			details: error instanceof Error ? error.message : String(error) 
 		}, 500);
 	}
+});
+
+// Photon referral intake
+app.get('/photon-referral', async (c) => {
+	const content = renderPhotonReferralForm();
+	return c.html(renderPage('Photon Referral', content));
+});
+
+app.post('/photon-referral', async (c) => {
+	const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+	const rateLimit = await checkRateLimit(ip, 'photon-referral', 5, 3600);
+	if (!rateLimit.allowed) {
+		return c.html(renderPage('Photon Referral', renderPhotonReferralForm({}, 'You’ve hit the referral intake limit. Please try again later.')), 429);
+	}
+
+	const formData = await c.req.formData();
+	const businessName = readFormValue(formData, 'businessName');
+	const contactName = readFormValue(formData, 'contactName');
+	const email = readFormValue(formData, 'email');
+	const phone = readFormValue(formData, 'phone');
+	const companySize = readFormValue(formData, 'companySize');
+	const notes = readFormValue(formData, 'notes');
+	const marketingConsent = formData.get('marketingConsent') === 'yes';
+
+	const values: Partial<PhotonReferral> = {
+		businessName,
+		contactName,
+		email,
+		phone,
+		companySize,
+		notes,
+		marketingConsent,
+	};
+
+	if (!businessName || !contactName || !email || !marketingConsent) {
+		return c.html(renderPage('Photon Referral', renderPhotonReferralForm(values, 'Please fill out the required fields and confirm consent before submitting.')), 400);
+	}
+
+	const referral: PhotonReferral = {
+		id: buildPhotonReferralId(businessName),
+		createdAt: new Date().toISOString(),
+		status: 'new',
+		businessName,
+		contactName,
+		email,
+		phone: phone || undefined,
+		companySize: companySize || undefined,
+		notes: notes || undefined,
+		marketingConsent,
+		source: 'photon-referral-form',
+	};
+
+	await c.env.BLOG_BUCKET.put(
+		`referrals/photon/${referral.id}.json`,
+		JSON.stringify(referral, null, 2),
+		{ httpMetadata: { contentType: 'application/json' } }
+	);
+
+	return c.html(renderPage('Photon Referral Saved', renderPhotonReferralSuccess(referral)));
+});
+
+app.get('/admin/photon-referrals', async (c) => {
+	const authHeader = c.req.header('Authorization');
+	if (!c.env.ADMIN_TOKEN || !authHeader || authHeader !== `Bearer ${c.env.ADMIN_TOKEN}`) {
+		return c.json({ error: 'Unauthorized' }, 401);
+	}
+
+	const referrals = await loadPhotonReferrals(c.env.BLOG_BUCKET);
+	return c.html(renderPage('Photon Referrals', renderPhotonReferralAdmin(referrals)));
 });
 
 // 404 handler
