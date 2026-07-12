@@ -18,6 +18,7 @@ import {
 } from './blog-helpers';
 import { scanAndRedact } from './security-scanner';
 import { generateHeroImage, getFallbackImage } from './atlas-warhol';
+import { attachBrandAttachments } from '../blog-branding';
 
 // Discord channel for approval notifications
 const DISCORD_CHANNEL = '1462343971530604624'; // #clawd-flo-updates
@@ -91,15 +92,20 @@ export class BlogWorkflow extends WorkflowEntrypoint<BlogWorkflowEnv, WorkflowSt
       console.log(`[BlogWorkflow] Found ${securityResult.findings.length} sensitive items, redacted`);
     }
 
+    // Attach topic-specific shared brand assets after the security scan so the daily path
+    // and the legacy workflow produce the same reviewable article shape.
+    const branded = attachBrandAttachments(securityResult.redactedContent, title, generateExcerpt(securityResult.redactedContent), tags);
+
     // Build the final post object
     const post: BlogPost = {
       slug: generateSlug(title),
       title,
-      content: securityResult.redactedContent,
-      excerpt: generateExcerpt(securityResult.redactedContent),
+      content: branded.content,
+      excerpt: generateExcerpt(branded.content),
       publishedAt: new Date().toISOString(),
       tags,
       heroImage,
+      assets: branded.assets,
       author: 'DevFlo',
       github
     };
@@ -170,6 +176,7 @@ export class BlogWorkflow extends WorkflowEntrypoint<BlogWorkflowEnv, WorkflowSt
       content: post.content,
       draft: false,
       heroImage: post.heroImage,
+      assets: post.assets,
       project: 'minte-blog-worker',
     };
 

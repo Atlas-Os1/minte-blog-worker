@@ -1,6 +1,7 @@
 // manual-blog-gen.ts - Manual blog generation (simplified, no Workflows API)
 
 import { scanAndRedact } from './workflows/security-scanner';
+import { attachBrandAttachments } from './blog-branding';
 
 export interface SimpleBlogPost {
   slug: string;
@@ -205,6 +206,8 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
   //   --store-r2
   // Then set heroImage to the R2 public URL
 
+  const branded = attachBrandAttachments(content, title, description, tags);
+
   const post: SimpleBlogPost = {
     slug: `${dateStr}-daily-update`,
     title,
@@ -212,10 +215,11 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
     pubDate: new Date().toISOString(),
     author: 'Flo',
     tags,
-    content,
+    content: branded.content,
     draft: false,
     project: inferProjectFromText(`${title} ${description} ${tags.join(' ')}`),
-    readingTime: estimateReadingTime(content)
+    readingTime: estimateReadingTime(branded.content),
+    assets: branded.assets
     // heroImage: 'https://pub-748cd0b5fd7d4d38a0c3ad5c09d205ae.r2.dev/skills/art_bucket/daily-update-${dateStr}.png'
   };
 
@@ -247,18 +251,22 @@ ${memory ? `## Source context\n\n${memory.content}` : '## Source context\n\nNo m
 
 Generated automatically for the protected memory section from shared workspace memory.`;
 
+  const memoryTags = ['memory', 'daily-update', 'shared-memory', ...inferTagsFromText(content)];
+  const branded = attachBrandAttachments(content, title, `Protected shared-memory digest for ${dateStr}.`, memoryTags);
+
   return {
     slug: `${dateStr}-shared-memory-digest`,
     title,
     description: `Protected shared-memory digest for ${dateStr}.`,
     pubDate: new Date().toISOString(),
     author: 'Dev',
-    tags: ['memory', 'daily-update', 'shared-memory', ...inferTagsFromText(content)],
-    content,
+    tags: memoryTags,
+    content: branded.content,
     draft: false,
     category: 'memory',
     project: 'openclaw',
-    readingTime: estimateReadingTime(content),
+    readingTime: estimateReadingTime(branded.content),
+    assets: branded.assets,
   };
 }
 
