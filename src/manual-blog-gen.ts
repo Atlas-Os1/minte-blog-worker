@@ -15,6 +15,7 @@ export interface SimpleBlogPost {
   project?: string;
   readingTime?: string;
   category?: string;
+  type?: 'daily-update' | 'blog-draft' | 'memory';
   heroImage?: string;
   assets?: string[];
 }
@@ -121,6 +122,16 @@ function estimateReadingTime(content: string): string {
   return `${Math.max(1, Math.ceil(words / 220))} min read`;
 }
 
+function generateExcerpt(content: string, maxLength = 200): string {
+  const plain = content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/[#>*_`]/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.length <= maxLength ? plain : `${plain.slice(0, maxLength).replace(/\s+\S*$/, '')}...`;
+}
+
 function summarizeGitHubActivity(activity: string): string {
   const lower = activity.toLowerCase();
   if (!activity.trim()) return '';
@@ -217,6 +228,7 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
     tags,
     content: branded.content,
     draft: false,
+    type: 'daily-update',
     project: inferProjectFromText(`${title} ${description} ${tags.join(' ')}`),
     readingTime: estimateReadingTime(branded.content),
     assets: branded.assets
@@ -226,6 +238,66 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
   return post;
 }
 
+export async function generateDetailedBlogDraft(bucket: R2Bucket, ai: Ai): Promise<SimpleBlogPost> {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateStr = yesterday.toISOString().split('T')[0];
+  const memory = await parseMemoryFile(bucket, dateStr);
+  const githubActivity = await fetchGitHubActivity(bucket, dateStr);
+  const sourceContext = [
+    memory ? `MEMORY (${memory.sourceKey}):\n${memory.content}` : 'MEMORY: no source file found',
+    githubActivity ? `GITHUB ACTIVITY:\n${githubActivity}` : 'GITHUB ACTIVITY: no source file found',
+  ].join('\n\n').slice(0, 14000);
+
+  const prompt = `You are preparing a private draft for the Minte.dev technical blog. Write a detailed, truthful teaching article from the source context below. Do not invent commits, metrics, URLs, deployments, or results. Keep the article separate from the short daily build note. Use Markdown only and include: a clear title as the first # heading, a practical explanation of what changed, why it matters, a code or configuration example only when supported by the source, a realistic terminal example only when supported by the source, and a short verification/checklist section. Do not include secrets or private data. Do not add documentation URLs unless they appear in the source; Cleo will verify current official documentation links during approval.\n\nSOURCE CONTEXT:\n${sourceContext}`;
+
+  const response = await ai.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
+    messages: [
+      { role: 'system', content: 'Return only the Markdown article draft.' },
+      { role: 'user', content: prompt },
+    ],
+  }) as { response?: unknown };
+
+  const generated = typeof response?.response === 'string' ? response.response.trim() : '';
+  if (!generated) {
+    throw new Error('Workers AI returned no Markdown draft');
+  }
+
+  const content = generated.startsWith('#') ? generated : `# Atlas / Minte Build Review - ${dateStr}\n\n${generated}`;
+  const title = content.match(/^#\s+(.+)$/m)?.[1]?.trim() || `Atlas / Minte Build Review - ${dateStr}`;
+  const description = generateExcerpt(content, 240);
+  const tags = ['blog-draft', 'building-in-public', ...inferTagsFromText(`${title}\n${content}`)];
+  const branded = attachBrandAttachments(content, title, description, tags);
+
+  return {
+    slug: `${dateStr}-blog-draft`,
+    title,
+    description,
+    pubDate: new Date().toISOString(),
+    author: 'Cleo',
+    tags: Array.from(new Set(tags)),
+    content: branded.content,
+    draft: true,
+    type: 'blog-draft',
+    project: inferProjectFromText(`${title} ${content}`),
+    readingTime: estimateReadingTime(branded.content),
+    assets: branded.assets,
+  };
+}
+
+export async function saveBlogDraft(bucket: R2Bucket, post: SimpleBlogPost): Promise<{ key: string }> {
+  const safePost = {
+    ...post,
+    draft: true,
+    type: 'blog-draft',
+  };
+  const key = `drafts/${post.slug}.json`;
+  await bucket.put(key, JSON.stringify(safePost, null, 2), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+  return { key };
+}
 
 export async function generateMemoryDigestPost(bucket: R2Bucket): Promise<SimpleBlogPost> {
   const today = new Date();
@@ -264,6 +336,7 @@ Generated automatically for the protected memory section from shared workspace m
     content: branded.content,
     draft: false,
     category: 'memory',
+    type: 'memory',
     project: 'openclaw',
     readingTime: estimateReadingTime(branded.content),
     assets: branded.assets,
@@ -493,6 +566,7 @@ export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId
       author: safePost.author,
       tags: safePost.tags,
       draft: safePost.draft,
+      type: safePost.type,
       project: safePost.project,
       readingTime: safePost.readingTime,
       category: safePost.category,

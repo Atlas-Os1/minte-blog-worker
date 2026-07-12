@@ -3,11 +3,12 @@ import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import { marked } from 'marked';
 import { cors } from 'hono/cors';
-import { generateBlogPost, generateMemoryDigestPost, publishPost } from './manual-blog-gen';
+import { generateBlogPost, generateDetailedBlogDraft, generateMemoryDigestPost, publishPost, saveBlogDraft } from './manual-blog-gen';
 
 type Bindings = {
 	BLOG_BUCKET: R2Bucket;
 	BLOG_WORKFLOW: Workflow;
+	AI: Ai;
 	CF_ZONE_ID: string;
 	CLOUDFLARE_API_TOKEN: string;
 	GITHUB_TOKEN: string;
@@ -86,6 +87,7 @@ type BlogPost = {
 	content: string;
 	draft: boolean;
 	category?: string;
+	type?: 'daily-update' | 'blog-draft' | 'memory';
 	heroImage?: string;
 	assets?: string[];
 };
@@ -2039,6 +2041,14 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (event
 		// Generate public build note and protected memory digest from yesterday's shared memory
 		const post = await generateBlogPost(env.BLOG_BUCKET, env.GITHUB_TOKEN);
 		const memoryPost = await generateMemoryDigestPost(env.BLOG_BUCKET);
+		let draftKey: string | null = null;
+		try {
+			const draft = await generateDetailedBlogDraft(env.BLOG_BUCKET, env.AI);
+			draftKey = (await saveBlogDraft(env.BLOG_BUCKET, draft)).key;
+			console.log('[Daily Blog] ✅ Private full-blog draft:', draftKey);
+		} catch (draftError) {
+			console.error('[Daily Blog] ⚠️ Full-blog draft failed; public update and memory will continue:', draftError);
+		}
 		
 		// Publish to R2 + update index + purge cache
 		const result = await publishPost(
