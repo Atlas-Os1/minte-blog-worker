@@ -75,18 +75,18 @@ Posts must be valid JSON with these fields:
 }
 ```
 
-### Hero Images (Optional)
+### Hero Images, Branding, and Reusable Assets (Optional)
 
-Upload to R2 `assets/` folder:
+Upload to R2 `assets/` folder using a durable path such as `assets/brands/...` or `assets/posts/<slug>/...`:
 
 ```bash
-npx wrangler r2 object put minte-blog-prod/assets/hero-image.png \
-  --file=/path/to/image.png
+npx wrangler r2 object put minte-blog-prod/assets/brands/hermes-agent/banner.png \
+  --file=/path/to/banner.png
 ```
 
 Reference in post content:
 ```markdown
-![Hero Image](https://pub-0be86ba29d2f4e66b59fe97deb2ea9d3.r2.dev/assets/hero-image.png)
+![Hermes Agent Banner](https://blog.minte.dev/assets/brands/hermes-agent/banner.png)
 ```
 
 ---
