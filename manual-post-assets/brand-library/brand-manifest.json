@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "purpose": "Reusable brand assets for Minte.dev blog posts; copy into a post bundle when a topic materially discusses the brand.",
+  "r2_prefix": "assets/brands/",
+  "assets": [
+    {
+      "brand": "hermes-agent",
+      "files": [
+        "banner.png",
+        "nous-logo.png"
+      ],
+      "source": "https://github.com/NousResearch/hermes-agent/tree/main/assets and https://github.com/NousResearch/hermes-agent/blob/main/website/static/img/nous-logo.png",
+      "notes": "Repository-provided Hermes/Nous assets."
+    },
+    {
+      "brand": "openmontage",
+      "files": [
+        "logo.png"
+      ],
+      "source": "https://github.com/Atlas-Os1/OpenMontage/blob/main/assets/logo.png",
+      "notes": "Repository-provided OpenMontage asset."
+    },
+    {
+      "brand": "cloudflare",
+      "files": [
+        "cloudflare.ico"
+      ],
+      "source": "https://www.cloudflare.com/favicon.ico",
+      "notes": "Official Cloudflare favicon; use for compact references."
+    },
+    {
+      "brand": "photon",
+      "files": [
+        "photon.svg"
+      ],
+      "source": "https://app.photon.codes/icon0.svg?icon0.38661a6d.svg",
+      "notes": "Photon Codes icon endpoint already used by the blog UI."
+    },
+    {
+      "brand": "github",
+      "files": [
+        "github.svg"
+      ],
+      "source": "https://github.githubassets.com/favicons/favicon.svg",
+      "notes": "GitHub-hosted official favicon SVG."
+    },
+    {
+      "brand": "anthropic",
+      "files": [
+        "anthropic.ico"
+      ],
+      "source": "https://www.anthropic.com/favicon.ico",
+      "notes": "Official Anthropic favicon."
+    },
+    {
+      "brand": "openai",
+      "files": [
+        "openai.svg"
+      ],
+      "source": "https://commons.wikimedia.org/wiki/Special:FilePath/OpenAI_logo_2025.svg",
+      "notes": "OpenAI 2025 logo sourced through Wikimedia Commons because openai.com blocks automated asset retrieval."
+    }
+  ],
+  "usage_rules": [
+    "Prefer the exact repository-provided asset for Hermes and OpenMontage.",
+    "Use the smallest suitable asset for inline diagrams; use banner.png only for hero/reference treatments.",
+    "Keep brand assets under assets/brands/<brand>/ and copy only the assets used by a specific post into assets/posts/<slug>/ when publishing that post.",
+    "Keep source URLs in this manifest when adding future brands."
+  ]
+}
