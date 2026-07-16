@@ -46,10 +46,13 @@ cd /home/flo/minte-blog-worker && npm run deploy
 
 ### Automated Daily Blog + Memory Digest (9 AM CST)
 
-**Current Status:** ✅ Worker cron configured in `wrangler.jsonc` (`0 15 * * *`). The scheduled handler generates and publishes two R2-backed posts:
+**Current Status:** ✅ Worker cron configured in `wrangler.jsonc` (`0 15 * * *`). The scheduled handler produces three separate outputs from the prior day's shared/workspace context:
 
-1. **Public build note** at `/posts/YYYY-MM-DD-daily-update` — concise bullet list plus short descriptions, generated from the prior day's shared/workspace memory and GitHub activity.
+1. **Public build note** at `/posts/YYYY-MM-DD-daily-update` — concise, separate daily activity note generated from shared/workspace memory and GitHub activity.
 2. **Protected memory digest** at `/memory` / `/posts/YYYY-MM-DD-shared-memory-digest` — category `memory`, hidden from the public homepage/API, and available only behind `MEMORY_PASSWORD`.
+3. **Private full-blog draft** at `drafts/YYYY-MM-DD-blog-draft.json` — Workers AI-generated teaching draft for Cleo review. It is not added to the public posts index and is not published automatically.
+
+The Workers AI binding is configured as `env.AI` with a remote binding in `wrangler.jsonc`. If AI generation fails, the public build note and protected memory digest continue independently.
 
 Memory source lookup checks these R2 prefixes in `minte-blog-prod`: `workspace/memory/`, `workspace/shared-memory/`, `shared-memory/`, `memory/`, and `hermes-memory/`.
 
