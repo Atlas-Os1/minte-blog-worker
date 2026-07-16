@@ -15,6 +15,7 @@ export const BLOG_REPOSITORIES: readonly BlogRepository[] = [
   { repo: 'Atlas-Os1/atlas-lanes', area: 'agents-skills-tools' },
   { repo: 'mintedmaterial/cleo-agent', area: 'agents-skills-tools' },
   { repo: 'Atlas-Os1/atlas-skills', area: 'agents-skills-tools' },
+  { repo: 'Atlas-Os1/skills-minte-dev', area: 'agents-skills-tools' },
   { repo: 'Atlas-Os1/atlas-cf-skills', area: 'agents-skills-tools' },
   { repo: 'Atlas-Os1/openclaw-memory-vectorize', area: 'agents-skills-tools' },
   { repo: 'Atlas-Os1/flo-social-worker', area: 'agents-skills-tools' },
