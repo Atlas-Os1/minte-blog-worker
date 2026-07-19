@@ -6,6 +6,8 @@ That is what we built for Minte AI Academy Episode 001: **Minte Image Lab**, a r
 
 <p class="blog-video"><video controls preload="metadata" playsinline width="100%" aria-label="Minte Image Lab Cloudflare Workers AI tutorial"><source src="/assets/posts/2026-07-19-build-local-first-ai-image-generator-cloudflare-workers-ai/final-cut.mp4" type="video/mp4">Your browser does not support inline video playback. <a href="/assets/posts/2026-07-19-build-local-first-ai-image-generator-cloudflare-workers-ai/final-cut.mp4">Open the final tutorial video</a>.</video></p>
 
+<p><strong>Prefer YouTube?</strong> <a href="https://youtu.be/h_Qukc8DPIc">Watch the episode on YouTube</a>.</p>
+
 The finished episode is deliberately two-voice. Colt introduces and closes the lesson. Cleo takes the technical middle and walks through the request path, the repository, the AI binding, validation, and the local demo.
 
 ## What you will build
@@ -254,6 +256,8 @@ The motion comes from breathing, bobbing, pulsing, jitter, and small lateral shi
 ## Watch the complete episode
 
 <p class="blog-video"><video controls preload="metadata" playsinline width="100%" aria-label="Complete Minte Image Lab tutorial"><source src="/assets/posts/2026-07-19-build-local-first-ai-image-generator-cloudflare-workers-ai/final-cut.mp4" type="video/mp4">Your browser does not support inline video playback. <a href="/assets/posts/2026-07-19-build-local-first-ai-image-generator-cloudflare-workers-ai/final-cut.mp4">Open the complete MP4</a>.</video></p>
+
+<p><a href="https://youtu.be/h_Qukc8DPIc">Watch the complete episode on YouTube</a>.</p>
 
 The final cut is 8 minutes and 37 seconds. Colt opens and closes the lesson, Cleo narrates the technical middle, and the last avatar scene closes the handoff cleanly.
 
