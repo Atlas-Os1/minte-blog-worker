@@ -29,6 +29,20 @@ The show uses a hybrid look: realistic outdoor environments and waterfowl plates
 
 The rule is simple: the environment carries realism, and the characters carry the comedy. A generated character cannot be pasted into a random plate and called finished. Scale, angle, lighting, color, contact shadows, and motion all have to agree.
 
+### The avatar identity comes first
+
+Before generating the episode takes, we locked the two recurring character identities. These are the actual reference inputs used to establish the MK and Tike avatar lanes:
+
+![MK character reference used for Episode One](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/mk-character-reference.jpg)
+
+*MK reference input used before generation.*
+
+![Tike character reference used for Episode One](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/tike-character-reference.jpg)
+
+*Tike reference input used before generation.*
+
+The references are identity anchors, not final scene frames. They gave the HeyGen Looks a stable target before we started generating modular dialogue coverage.
+
 We also kept the project organized into separate lanes:
 
 - **Brief and storyboard:** the story beats, dialogue order, safety notes, and episode plan.
@@ -58,6 +72,18 @@ The approved cloud-buster reveal and reaction shots were stored as canonical cha
 
 This modular approach gave us options. It also created a new responsibility: every take had to be labeled, probed, and reviewed before it was allowed into the assembly.
 
+### The first generated performance checks
+
+The first usable outputs were reviewed as contact sheets, not accepted from filenames alone. These are real review artifacts from the MK/Tike character-performance lane:
+
+![MK generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/mk-generated-performance-contact.jpg)
+
+*MK coverage for the normal-method beat.*
+
+![Tike generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/tike-generated-performance-contact.jpg)
+
+*Tike coverage for the advanced-arrival beat.*
+
 ## Add generated coverage where the story needs it
 
 HeyGen carried the main MK/Tike performance lane. Additional generated coverage filled specific story beats that the first batch did not cover, including the off-switch, the “did it work?” reaction, the county-line exchange, and Tike’s dominance payoff.
@@ -65,6 +91,12 @@ HeyGen carried the main MK/Tike performance lane. Additional generated coverage 
 Those shots were not treated as interchangeable filler. Each had a place in the storyboard. We selected one usable version per beat, excluded raw and duplicate copies, and documented the visible style difference between the HeyGen lane and the additional generated lane instead of pretending they were identical.
 
 The ducks also received a dedicated comedy beat. Their dialogue was planned as a sequence—male voice, female voice, male voice—so the scene could function as an actual punchline rather than a single effect layered over wildlife footage.
+
+The duck performance received its own review lane because the final joke depends on dialogue order and distinct voices.
+
+![Duck generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/ducks-generated-performance-contact.jpg)
+
+*Duck performance review sheet for the final smack-talk button.*
 
 ## Edit against the plan, not against the folder
 
@@ -81,7 +113,27 @@ A folder full of clips can make an assembly look productive while still producin
 - Do the duck voices arrive as a three-line comedy button?
 - Does the final field report close the story instead of merely ending the file?
 
-That pass removed misplaced clips, extra coverage, repeated holds, duplicate renders, and segments that were technically valid but editorially wrong. The generated-version recut intentionally excludes the supplied example/reference video and uses our own generated coverage instead.
+That pass removed misplaced clips, extra coverage, repeated holds, duplicate renders, and segments that were technically valid but editorially wrong. The final titled render uses the approved editorial order and the project’s own generated coverage rather than the supplied example/reference video.
+
+### The real edit beats
+
+These stills come directly from the plan-aligned Episode One assembly. They show the editorial chain as it happened: setup, escalation, prop reveal, and comedy payoff.
+
+![Episode One snippet: MK starts with the normal method](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-mk-normal-method.jpg)
+
+*01 — MK establishes the normal method before Tike changes the temperature of the scene.*
+
+![Episode One snippet: Tike arrives with the advanced solution](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-tike-arrival.jpg)
+
+*02 — Tike enters with the oversized solution and the confidence to sell it.*
+
+![Episode One snippet: the Widow Maker reveal](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-widow-maker-reveal.jpg)
+
+*03 — The fictional Widow Maker becomes a visual prop, not just a line of dialogue.*
+
+![Episode One snippet: the ducks talk back](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-duck-smack-talk.jpg)
+
+*04 — The ducks get the last word, which is the comedy payoff the edit was built around.*
 
 ## Treat sound as part of the joke
 
@@ -95,14 +147,14 @@ This is also where the safety framing becomes audible: the “boom” is a post-
 
 The working generated cut was not accepted because FFmpeg completed. It was checked as a piece of media:
 
-- Runtime: **98.104 seconds**
-- Frame: **1280×720**
-- Frame rate: **30 fps**
+- Primary final render: **`ep-one-titled.mp4`**
+- Runtime: **60.999 seconds**
+- Frame: **1920×1080**
+- Frame rate: **24 fps**
 - Video: **H.264**
-- Audio: **AAC, 48 kHz stereo**
+- Audio: **AAC, 44.1 kHz stereo**
 - Full decode: **PASS**
-- Final field-report card: **PASS**
-- SHA-256: `1c7cb153c1ed654b7dcff30c9d475082c91c4d254d9f49651075e46c1a413795`
+- SHA-256: `46280c4bbd2ad7edac04fef5571f8e925f7d0abbc97816fbae1a8e54355052c4`
 
 We also reviewed contact sheets and the timeline for misplaced or extra material. That distinction matters: a technically playable render can still be the wrong edit.
 
@@ -136,66 +188,27 @@ The reliable loop is:
 
 That loop is slower than throwing every clip into a timeline. It is faster than trying to rescue a padded episode after the fact.
 
-## The actual character and shot references
+## Watch the final episode render
 
-The character images below are the real inputs and review artifacts from this episode—not replacement art made for the blog.
+This is the final titled 16:9 Episode One render—not the earlier edit attempt:
 
-### Character references used before generation
+<video controls preload="metadata" playsinline poster="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/hero-poster.jpg"><source src="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/episode-001-final-titled.mp4" type="video/mp4">Your browser does not support embedded video. <a href="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/episode-001-final-titled.mp4">Watch the final titled Episode One render</a>.</video>
 
-![MK character reference used for Episode One](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/mk-character-reference.jpg)
+The final render is the delivery version used for the article’s primary episode reference. The older generated-version review file is no longer referenced or included in this article’s asset manifest.
 
-*MK reference input from the Episode One project.*
+## The vertical delivery cut
 
-![Tike character reference used for Episode One](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/tike-character-reference.jpg)
+The same production was also delivered as the shot-aware smart 9:16 Reel. It keeps the vertical framing decisions separate from the 16:9 episode master:
 
-*Tike reference input from the Episode One project.*
+<video controls preload="metadata" playsinline poster="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/smart-reel-poster.jpg"><source src="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/episode-001-final-smart-reel.mp4" type="video/mp4">Your browser does not support embedded video. <a href="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/episode-001-final-smart-reel.mp4">Watch the final smart 9:16 Reel</a>.</video>
 
-These references established the identity lane before the HeyGen takes were generated. The output was then reviewed as contact sheets so we could reject drift instead of assuming that a successful generation still looked like the same character.
-
-### Generated performance review sheets
-
-![MK generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/mk-generated-performance-contact.jpg)
-
-*Actual MK performance coverage: the normal-method beat.*
-
-![Tike generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/tike-generated-performance-contact.jpg)
-
-*Actual Tike performance coverage: the advanced-arrival beat.*
-
-![Duck generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/ducks-generated-performance-contact.jpg)
-
-*Actual duck performance review sheet for the final smack-talk button.*
-
-## Real snippets from the Episode One edit
-
-These stills come directly from the plan-aligned Episode One assembly. They show the actual editorial handoff from setup to escalation to payoff:
-
-![Episode One snippet: MK starts with the normal method](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-mk-normal-method.jpg)
-
-*01 — MK establishes the normal method before Tike changes the temperature of the scene.*
-
-![Episode One snippet: Tike arrives with the advanced solution](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-tike-arrival.jpg)
-
-*02 — Tike enters with the oversized solution and the confidence to sell it.*
-
-![Episode One snippet: the Widow Maker reveal](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-widow-maker-reveal.jpg)
-
-*03 — The fictional Widow Maker becomes a visual prop, not just a line of dialogue.*
-
-![Episode One snippet: the ducks talk back](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-duck-smack-talk.jpg)
-
-*04 — The ducks get the last word, which is the comedy payoff the edit was built around.*
-
-The distinction between these images matters: the reference photos are identity anchors, the contact sheets are generated-performance review evidence, and the four snippets are frames from the actual assembled episode. Together they show the chain from character continuity to finished editorial beat.
-
-## Watch the working cut
-
-This is the generated-version Episode One review cut used for the production and QA pass:
-
-<video controls preload="metadata" playsinline poster="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/hero-poster.jpg"><source src="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/episode-001-generated-version-review.mp4" type="video/mp4">Your browser does not support embedded video. <a href="/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/episode-001-generated-version-review.mp4">Watch the verified Episode One working cut</a>.</video>
+- Smart Reel runtime: **61.033 seconds**
+- Frame: **1080×1920**
+- Frame rate: **24 fps**
+- SHA-256: `eb8baddaa9e338a8db4718ce4c86fb6fa26075c49d5f1625d57b74787555fd2d`
 
 ## Closing field note
 
-MK & Tike Outdoors Episode One is a small production, but it contains the whole lesson: the story is planned before the prompts, the characters are kept consistent across takes, generated media is selected instead of blindly concatenated, sound carries the escalation, and every export gets judged as an edit—not just as a successful render.
+MK & Tike Outdoors Episode One is a small production, but it contains the whole lesson: the story is planned before the prompts, the avatars are locked before the takes, generated media is selected instead of blindly concatenated, sound carries the escalation, and every export gets judged as an edit—not just as a successful render.
 
 That is how we turn a funny premise into a repeatable production system.
