@@ -136,6 +136,58 @@ The reliable loop is:
 
 That loop is slower than throwing every clip into a timeline. It is faster than trying to rescue a padded episode after the fact.
 
+## The actual character and shot references
+
+The character images below are the real inputs and review artifacts from this episode—not replacement art made for the blog.
+
+### Character references used before generation
+
+![MK character reference used for Episode One](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/mk-character-reference.jpg)
+
+*MK reference input from the Episode One project.*
+
+![Tike character reference used for Episode One](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/tike-character-reference.jpg)
+
+*Tike reference input from the Episode One project.*
+
+These references established the identity lane before the HeyGen takes were generated. The output was then reviewed as contact sheets so we could reject drift instead of assuming that a successful generation still looked like the same character.
+
+### Generated performance review sheets
+
+![MK generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/mk-generated-performance-contact.jpg)
+
+*Actual MK performance coverage: the normal-method beat.*
+
+![Tike generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/tike-generated-performance-contact.jpg)
+
+*Actual Tike performance coverage: the advanced-arrival beat.*
+
+![Duck generated performance contact sheet](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/ducks-generated-performance-contact.jpg)
+
+*Actual duck performance review sheet for the final smack-talk button.*
+
+## Real snippets from the Episode One edit
+
+These stills come directly from the plan-aligned Episode One assembly. They show the actual editorial handoff from setup to escalation to payoff:
+
+![Episode One snippet: MK starts with the normal method](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-mk-normal-method.jpg)
+
+*01 — MK establishes the normal method before Tike changes the temperature of the scene.*
+
+![Episode One snippet: Tike arrives with the advanced solution](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-tike-arrival.jpg)
+
+*02 — Tike enters with the oversized solution and the confidence to sell it.*
+
+![Episode One snippet: the Widow Maker reveal](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-widow-maker-reveal.jpg)
+
+*03 — The fictional Widow Maker becomes a visual prop, not just a line of dialogue.*
+
+![Episode One snippet: the ducks talk back](/assets/posts/2026-07-26-making-mk-and-tike-outdoors-episode-one/snippet-duck-smack-talk.jpg)
+
+*04 — The ducks get the last word, which is the comedy payoff the edit was built around.*
+
+The distinction between these images matters: the reference photos are identity anchors, the contact sheets are generated-performance review evidence, and the four snippets are frames from the actual assembled episode. Together they show the chain from character continuity to finished editorial beat.
+
 ## Watch the working cut
 
 This is the generated-version Episode One review cut used for the production and QA pass:
