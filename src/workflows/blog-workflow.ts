@@ -18,7 +18,6 @@ import {
 } from './blog-helpers';
 import { scanAndRedact } from './security-scanner';
 import { generateHeroImage, getFallbackImage } from './atlas-warhol';
-import { attachBrandAttachments } from '../blog-branding';
 
 // Discord channel for approval notifications
 const DISCORD_CHANNEL = '1462343971530604624'; // #clawd-flo-updates
@@ -92,20 +91,15 @@ export class BlogWorkflow extends WorkflowEntrypoint<BlogWorkflowEnv, WorkflowSt
       console.log(`[BlogWorkflow] Found ${securityResult.findings.length} sensitive items, redacted`);
     }
 
-    // Attach topic-specific shared brand assets after the security scan so the daily path
-    // and the legacy workflow produce the same reviewable article shape.
-    const branded = attachBrandAttachments(securityResult.redactedContent, title, generateExcerpt(securityResult.redactedContent), tags);
-
     // Build the final post object
     const post: BlogPost = {
       slug: generateSlug(title),
       title,
-      content: branded.content,
-      excerpt: generateExcerpt(branded.content),
+      content: securityResult.redactedContent,
+      excerpt: generateExcerpt(securityResult.redactedContent),
       publishedAt: new Date().toISOString(),
       tags,
       heroImage,
-      assets: branded.assets,
       author: 'DevFlo',
       github
     };
@@ -166,49 +160,33 @@ export class BlogWorkflow extends WorkflowEntrypoint<BlogWorkflowEnv, WorkflowSt
   // ═══════════════════════════════════════════════════════════════
   private async publishComplete(post: BlogPost): Promise<PublishResult> {
     const bucket = this.env.BLOG_BUCKET;
-    const publicPost = {
-      slug: post.slug,
-      title: post.title,
-      description: post.excerpt,
-      pubDate: post.publishedAt,
-      author: post.author,
-      tags: post.tags,
-      content: post.content,
-      draft: false,
-      heroImage: post.heroImage,
-      assets: post.assets,
-      project: 'minte-blog-worker',
-    };
 
-    // 1. Upload renderer-compatible post JSON
+    // 1. Upload post JSON
     await bucket.put(
       `posts/${post.slug}.json`,
-      JSON.stringify(publicPost, null, 2),
+      JSON.stringify(post, null, 2),
       { httpMetadata: { contentType: 'application/json' } }
     );
 
-    // 2. Update the same posts-index.json consumed by the public site
-    const indexObj = await bucket.get('posts-index.json');
-    const index: { posts: any[]; tags: Record<string, number> } = indexObj
-      ? await indexObj.json()
-      : { posts: [], tags: {} };
+    // 2. Update posts-index.json
+    const indexObj = await bucket.get('metadata/posts-index.json');
+    const posts: PostMeta[] = indexObj 
+      ? await indexObj.json() 
+      : [];
     
-    const postMeta = { ...publicPost };
-    delete (postMeta as any).content;
-    index.posts = (index.posts || []).filter((existing) => existing.slug !== post.slug);
-    index.posts.unshift(postMeta);
-    index.tags = {};
-    for (const indexedPost of index.posts) {
-      if (indexedPost.draft || indexedPost.category === 'memory') continue;
-      for (const tag of indexedPost.tags || []) {
-        index.tags[tag] = (index.tags[tag] || 0) + 1;
-      }
-    }
+    // Prepend new post (newest first)
+    posts.unshift({
+      slug: post.slug,
+      title: post.title,
+      date: post.publishedAt,
+      tags: post.tags,
+      excerpt: post.excerpt,
+      heroImage: post.heroImage
+    });
 
     await bucket.put(
-      'posts-index.json',
-      JSON.stringify(index, null, 2),
-      { httpMetadata: { contentType: 'application/json' } }
+      'metadata/posts-index.json',
+      JSON.stringify(posts, null, 2)
     );
 
     // 3. Purge Cloudflare cache

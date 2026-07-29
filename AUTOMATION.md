@@ -44,19 +44,17 @@ This will:
 cd /home/flo/minte-blog-worker && npm run deploy
 ```
 
-### Automated Daily Blog + Memory Digest (9 AM CST)
+### Automated Daily Blog (9 AM CST)
 
-**Current Status:** ✅ Worker cron configured in `wrangler.jsonc` (`0 15 * * *`). The scheduled handler produces three separate outputs from the prior day's shared/workspace context:
+**Current Status:** ⏳ Not yet automated
 
-1. **Public build note** at `/posts/YYYY-MM-DD-daily-update` — concise, separate daily activity note generated from shared/workspace memory and GitHub activity.
-2. **Protected memory digest** at `/memory` / `/posts/YYYY-MM-DD-shared-memory-digest` — category `memory`, hidden from the public homepage/API, and available only behind `MEMORY_PASSWORD`.
-3. **Private full-blog draft** at `drafts/YYYY-MM-DD-blog-draft.json` — Workers AI-generated teaching draft for Cleo review. It is not added to the public posts index and is not published automatically.
+**Plan:**
+1. Cron job at 9 AM CST generates draft blog from yesterday's memory
+2. Posts preview to Discord #blog-approvals
+3. On `approve blog` → Publish with script above
+4. Trigger worker redeploy for immediate visibility
 
-The Workers AI binding is configured as `env.AI` with a remote binding in `wrangler.jsonc`. If AI generation fails, the public build note and protected memory digest continue independently.
-
-Memory source lookup checks these R2 prefixes in `minte-blog-prod`: `workspace/memory/`, `workspace/shared-memory/`, `shared-memory/`, `memory/`, and `hermes-memory/`.
-
-The publish path updates `posts-index.json`, keeps memory posts out of public tag counts, and purges Worker cache via the configured Cloudflare secrets.
+**To implement:** Add cron job via Clawdbot gateway
 
 ---
 
@@ -80,17 +78,20 @@ Posts must be valid JSON with these fields:
 
 ### Hero Images, Branding, and Reusable Assets (Optional)
 
-Upload to R2 `assets/` folder using a durable path such as `assets/brands/...` or `assets/posts/<slug>/...`:
+Upload project media to the R2 `assets/` folder using a durable path such as `assets/branding/...` or `assets/posts/<slug>/...`:
 
 ```bash
-npx wrangler r2 object put minte-blog-prod/assets/brands/hermes-agent/banner.png \
+npx wrangler r2 object put minte-blog-prod/assets/branding/hermes-agent-banner.png \
   --file=/path/to/banner.png
 ```
 
 Reference in post content:
+
 ```markdown
-![Hermes Agent Banner](https://blog.minte.dev/assets/brands/hermes-agent/banner.png)
+![Hermes Agent Banner](https://blog.minte.dev/assets/branding/hermes-agent-banner.png)
 ```
+
+For post-specific diagrams or attachments, keep them under `assets/posts/<slug>/...` so they can be reused by the article and by future posts that mention the same project or product.
 
 ---
 

@@ -1,7 +1,13 @@
 // blog-helpers.ts - Memory parsing and GitHub API helpers
 
 import type { MemoryEntry, GitHubActivity, GitHubCommit, GitHubPR } from './types/blog';
-import { GITHUB_REPOS } from './blog-repos';
+
+const GITHUB_REPOS = [
+  'Atlas-Os1/devflo-moltworker',
+  'Atlas-Os1/kiamichi-biz-connect',
+  'Atlas-Os1/atlas-dashboard',
+  'Atlas-Os1/twistedcustomleather'
+];
 
 /**
  * Parse memory markdown files into structured entries

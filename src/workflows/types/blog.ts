@@ -8,7 +8,6 @@ export interface BlogPost {
   publishedAt: string;
   tags: string[];
   heroImage?: string;
-  assets?: string[];
   author: string;
   github?: GitHubActivity;
 }

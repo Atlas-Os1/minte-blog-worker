@@ -1,7 +1,6 @@
 // manual-blog-gen.ts - Manual blog generation (simplified, no Workflows API)
 
 import { scanAndRedact } from './workflows/security-scanner';
-import { attachBrandAttachments } from './blog-branding';
 
 export interface SimpleBlogPost {
   slug: string;
@@ -14,10 +13,6 @@ export interface SimpleBlogPost {
   draft: boolean;
   project?: string;
   readingTime?: string;
-  category?: string;
-  type?: 'daily-update' | 'blog-draft' | 'memory';
-  heroImage?: string;
-  assets?: string[];
 }
 
 export interface PostIndex {
@@ -29,61 +24,25 @@ interface MemoryHighlight {
   date: string;
   content: string;
   headers: string[];
-  bullets: string[];
-  sourceKey: string;
-}
-
-const MEMORY_PREFIXES = [
-  'workspace/memory/',
-  'workspace/shared-memory/',
-  'shared-memory/',
-  'memory/',
-  'hermes-memory/',
-];
-
-function extractBullets(content: string): string[] {
-  return content
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => /^[-*]\s+\S/.test(line))
-    .map((line) => line.replace(/^[-*]\s+/, '').replace(/\s+/g, ' ').trim())
-    .filter((line) => line.length > 8 && !/(token|secret|password|private key)/i.test(line))
-    .slice(0, 12);
 }
 
 async function parseMemoryFile(bucket: R2Bucket, date: string): Promise<MemoryHighlight | null> {
-  for (const prefix of MEMORY_PREFIXES) {
-    const key = `${prefix}${date}.md`;
-    try {
-      const obj = await bucket.get(key);
-      if (!obj) continue;
-      const content = await obj.text();
-      const headers = content.match(/^#{1,3} .+$/gm) || [];
-      return {
-        date,
-        content: content.slice(0, 4000),
-        headers: headers.map((h: string) => h.replace(/^#{1,3} /, '')),
-        bullets: extractBullets(content),
-        sourceKey: key,
-      };
-    } catch (error) {
-      console.error(`Failed to parse memory for ${key}:`, error);
-    }
+  try {
+    const obj = await bucket.get(`workspace/memory/${date}.md`);
+    if (!obj) return null;
+    
+    const content = await obj.text();
+    const headers = content.match(/^##? .+$/gm) || [];
+    
+    return {
+      date,
+      content: content.slice(0, 1000), // First 1000 chars for context
+      headers: headers.map((h: string) => h.replace(/^##? /, ''))
+    };
+  } catch (error) {
+    console.error(`Failed to parse memory for ${date}:`, error);
+    return null;
   }
-  return null;
-}
-
-function bulletSummary(memory: MemoryHighlight | null, githubActivity: string): string[] {
-  const bullets = [...(memory?.bullets || [])];
-  if (bullets.length === 0 && memory?.headers.length) {
-    bullets.push(...memory.headers.slice(0, 8));
-  }
-  if (githubActivity.trim()) {
-    bullets.push(summarizeGitHubActivity(githubActivity));
-  }
-  return Array.from(new Set(bullets))
-    .slice(0, 8)
-    .map((item) => item.replace(/[\r\n]+/g, ' ').trim());
 }
 
 async function fetchGitHubActivity(bucket: R2Bucket, date: string): Promise<string> {
@@ -120,16 +79,6 @@ function inferProjectFromText(text: string): string {
 function estimateReadingTime(content: string): string {
   const words = content.replace(/```[\s\S]*?```/g, '').split(/\s+/).filter(Boolean).length;
   return `${Math.max(1, Math.ceil(words / 220))} min read`;
-}
-
-function generateExcerpt(content: string, maxLength = 200): string {
-  const plain = content
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/[#>*_`]/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return plain.length <= maxLength ? plain : `${plain.slice(0, maxLength).replace(/\s+\S*$/, '')}...`;
 }
 
 function summarizeGitHubActivity(activity: string): string {
@@ -173,11 +122,9 @@ export async function generateBlogPost(bucket: R2Bucket, githubToken?: string): 
 
 ## What Happened on ${dateStr}
 
-${bulletSummary(memory, githubActivity).map((item) => `- **${item.split(':')[0]}**${item.includes(':') ? ':' + item.split(':').slice(1).join(':') : ''}`).join('\n')}
+${memory.headers.map((h, i) => `${i + 1}. **${h}**`).join('\n')}
 
 ---
-
-### Source memory context
 
 ${memory.content}
 
@@ -185,7 +132,7 @@ ${memory.content}
 
 ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` : ''}
 
-**Development Notes:** Daily log automatically generated from shared workspace memory files${githubActivity ? ' and GitHub activity' : ''}. Source: ${memory.sourceKey}.
+**Development Notes:** Daily log automatically generated from workspace memory files${githubActivity ? ' and GitHub activity' : ''}.
 
 ---
 
@@ -200,7 +147,9 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
     tags = ['daily-update', 'building-in-public', ...inferTagsFromText(githubActivity)];
     content = `# ${title}
 
-${bulletSummary(memory, githubActivity).length ? bulletSummary(memory, githubActivity).map((item) => `- **${item}**`).join('\n') : '- **Systems check:** No major shared-memory bullets were logged for this date.\n- **Ongoing work:** Continuing development across Handy Beaver, Kiamichi Biz Connect, Minte Blog Worker, OpenClaw memory, and related Cloudflare repos.'}
+No major activities logged for ${dateStr}.
+
+Continuing development work across Handy Beaver, Kiamichi Biz Connect, Minte Blog Worker, OpenClaw memory, and related Cloudflare repos.
 
 ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` : ''}
 
@@ -217,8 +166,6 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
   //   --store-r2
   // Then set heroImage to the R2 public URL
 
-  const branded = attachBrandAttachments(content, title, description, tags);
-
   const post: SimpleBlogPost = {
     slug: `${dateStr}-daily-update`,
     title,
@@ -226,121 +173,14 @@ ${githubActivity ? `\n## Development Activity\n\n${githubActivity}\n\n---\n\n` :
     pubDate: new Date().toISOString(),
     author: 'Flo',
     tags,
-    content: branded.content,
+    content,
     draft: false,
-    type: 'daily-update',
     project: inferProjectFromText(`${title} ${description} ${tags.join(' ')}`),
-    readingTime: estimateReadingTime(branded.content),
-    assets: branded.assets
+    readingTime: estimateReadingTime(content)
     // heroImage: 'https://pub-748cd0b5fd7d4d38a0c3ad5c09d205ae.r2.dev/skills/art_bucket/daily-update-${dateStr}.png'
   };
 
   return post;
-}
-
-export async function generateDetailedBlogDraft(bucket: R2Bucket, ai: Ai): Promise<SimpleBlogPost> {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const dateStr = yesterday.toISOString().split('T')[0];
-  const memory = await parseMemoryFile(bucket, dateStr);
-  const githubActivity = await fetchGitHubActivity(bucket, dateStr);
-  const sourceContext = [
-    memory ? `MEMORY (${memory.sourceKey}):\n${memory.content}` : 'MEMORY: no source file found',
-    githubActivity ? `GITHUB ACTIVITY:\n${githubActivity}` : 'GITHUB ACTIVITY: no source file found',
-  ].join('\n\n').slice(0, 14000);
-
-  const prompt = `You are preparing a private draft for the Minte.dev technical blog. Write a detailed, truthful teaching article from the source context below. Do not invent commits, metrics, URLs, deployments, or results. Keep the article separate from the short daily build note. Use Markdown only and include: a clear title as the first # heading, a practical explanation of what changed, why it matters, a code or configuration example only when supported by the source, a realistic terminal example only when supported by the source, and a short verification/checklist section. Do not include secrets or private data. Do not add documentation URLs unless they appear in the source; Cleo will verify current official documentation links during approval.\n\nSOURCE CONTEXT:\n${sourceContext}`;
-
-  const response = await ai.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
-    messages: [
-      { role: 'system', content: 'Return only the Markdown article draft.' },
-      { role: 'user', content: prompt },
-    ],
-  }) as { response?: unknown };
-
-  const generated = typeof response?.response === 'string' ? response.response.trim() : '';
-  if (!generated) {
-    throw new Error('Workers AI returned no Markdown draft');
-  }
-
-  const content = generated.startsWith('#') ? generated : `# Atlas / Minte Build Review - ${dateStr}\n\n${generated}`;
-  const title = content.match(/^#\s+(.+)$/m)?.[1]?.trim() || `Atlas / Minte Build Review - ${dateStr}`;
-  const description = generateExcerpt(content, 240);
-  const tags = ['blog-draft', 'building-in-public', ...inferTagsFromText(`${title}\n${content}`)];
-  const branded = attachBrandAttachments(content, title, description, tags);
-
-  return {
-    slug: `${dateStr}-blog-draft`,
-    title,
-    description,
-    pubDate: new Date().toISOString(),
-    author: 'Cleo',
-    tags: Array.from(new Set(tags)),
-    content: branded.content,
-    draft: true,
-    type: 'blog-draft',
-    project: inferProjectFromText(`${title} ${content}`),
-    readingTime: estimateReadingTime(branded.content),
-    assets: branded.assets,
-  };
-}
-
-export async function saveBlogDraft(bucket: R2Bucket, post: SimpleBlogPost): Promise<{ key: string }> {
-  const safePost = {
-    ...post,
-    draft: true,
-    type: 'blog-draft',
-  };
-  const key = `drafts/${post.slug}.json`;
-  await bucket.put(key, JSON.stringify(safePost, null, 2), {
-    httpMetadata: { contentType: 'application/json' },
-  });
-  return { key };
-}
-
-export async function generateMemoryDigestPost(bucket: R2Bucket): Promise<SimpleBlogPost> {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const dateStr = yesterday.toISOString().split('T')[0];
-  const memory = await parseMemoryFile(bucket, dateStr);
-  const bullets = bulletSummary(memory, '');
-  const title = `Shared Memory Digest - ${dateStr}`;
-  const summary = bullets.length
-    ? bullets.map((item) => `- ${item}`).join('\n')
-    : '- No shared-memory bullets were found for this date.';
-
-  const content = `# ${title}
-
-## Daily changes
-
-${summary}
-
-${memory ? `## Source context\n\n${memory.content}` : '## Source context\n\nNo memory source object was found in the configured blog/shared-memory prefixes.'}
-
----
-
-Generated automatically for the protected memory section from shared workspace memory.`;
-
-  const memoryTags = ['memory', 'daily-update', 'shared-memory', ...inferTagsFromText(content)];
-  const branded = attachBrandAttachments(content, title, `Protected shared-memory digest for ${dateStr}.`, memoryTags);
-
-  return {
-    slug: `${dateStr}-shared-memory-digest`,
-    title,
-    description: `Protected shared-memory digest for ${dateStr}.`,
-    pubDate: new Date().toISOString(),
-    author: 'Dev',
-    tags: memoryTags,
-    content: branded.content,
-    draft: false,
-    category: 'memory',
-    type: 'memory',
-    project: 'openclaw',
-    readingTime: estimateReadingTime(branded.content),
-    assets: branded.assets,
-  };
 }
 
 // Keep the old R2 collaboration post function for reference
@@ -558,20 +398,14 @@ export async function publishPost(bucket: R2Bucket, post: SimpleBlogPost, zoneId
     }
     
     // Update or add post (prevent duplicates)
-    const postMeta: Omit<SimpleBlogPost, 'content'> = {
+    const postMeta = {
       slug: safePost.slug,
       title: safePost.title,
       description: safePost.description,
       pubDate: safePost.pubDate,
       author: safePost.author,
       tags: safePost.tags,
-      draft: safePost.draft,
-      type: safePost.type,
-      project: safePost.project,
-      readingTime: safePost.readingTime,
-      category: safePost.category,
-      heroImage: safePost.heroImage,
-      assets: safePost.assets,
+      draft: safePost.draft
     };
     
     // Remove existing post with same slug (if any)
