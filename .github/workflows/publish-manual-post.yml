@@ -1,0 +1,225 @@
+name: Publish Manual Blog Post
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_file:
+        description: Path to a checked-in post JSON file
+        required: true
+        default: manual-posts/2026-07-02-atlas-minte-autopilot-test.json
+      assets_dir:
+        description: Optional directory of assets to upload to R2 at assets/posts/<slug>/
+        required: false
+        default: ''
+      bucket:
+        description: R2 bucket name
+        required: true
+        default: minte-blog-prod
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Validate post JSON and safety scan
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const postPath = process.env.POST_FILE;
+          const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+          const required = ['slug', 'title', 'description', 'pubDate', 'author', 'tags', 'content', 'draft'];
+          for (const key of required) {
+            if (!(key in post)) throw new Error(`Missing required post field: ${key}`);
+          }
+          if (!Array.isArray(post.tags)) throw new Error('post.tags must be an array');
+          const raw = JSON.stringify(post);
+          const patterns = [
+            /sk-ant-/i,
+            /ghp_/i,
+            /gho_/i,
+            /xox/i,
+            /localhost/i,
+            /127\.0\.0\.1/,
+            /\b10\.\d+\.\d+\.\d+\b/,
+            /\b172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+\b/,
+            /\b192\.168\.\d+\.\d+\b/,
+            /\b100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+\b/,
+            /password\s*[:=]/i,
+            /secret\s*[:=]/i,
+            /private key/i,
+          ];
+          const hit = patterns.find((pattern) => pattern.test(raw));
+          if (hit) throw new Error(`Safety scan failed: ${hit}`);
+          console.log(`Validated ${post.slug}`);
+          NODE
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+
+      - name: Download current posts index
+        run: |
+          npx wrangler@latest r2 object get "${{ inputs.bucket }}/posts-index.json" --file=/tmp/posts-index.json --remote
+
+      - name: Update posts index locally
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const postPath = process.env.POST_FILE;
+          const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+          const indexPath = '/tmp/posts-index.json';
+          const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+          const meta = { ...post };
+          delete meta.content;
+          index.posts = (index.posts || []).filter((existing) => existing.slug !== post.slug);
+          index.posts.unshift(meta);
+          index.tags = {};
+          for (const item of index.posts) {
+            if (item.draft || item.category === 'memory') continue;
+            for (const tag of item.tags || []) {
+              index.tags[tag] = (index.tags[tag] || 0) + 1;
+            }
+          }
+          fs.writeFileSync(indexPath, JSON.stringify(index, null, 2) + '\n');
+          console.log(`Indexed ${post.slug}; total posts in index: ${index.posts.length}`);
+          NODE
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+
+      - name: Upload optional post asset bundle to R2
+        run: |
+          ASSETS_DIR="${{ inputs.assets_dir }}"
+          if [ -z "$ASSETS_DIR" ]; then
+            echo "No assets_dir provided; skipping post asset upload."
+            exit 0
+          fi
+          if [ ! -d "$ASSETS_DIR" ]; then
+            echo "assets_dir does not exist or is not a directory: $ASSETS_DIR" >&2
+            exit 1
+          fi
+
+          SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
+          ASSET_COUNT=0
+          while IFS= read -r -d '' FILE; do
+            RELATIVE_PATH="${FILE#${ASSETS_DIR}/}"
+            KEY="assets/posts/${SLUG}/${RELATIVE_PATH}"
+            CONTENT_TYPE=$(node -e "const path=require('path'); const ext=path.extname(process.argv[1]).toLowerCase(); const map={'.avif':'image/avif','.css':'text/css; charset=utf-8','.gif':'image/gif','.htm':'text/html; charset=utf-8','.html':'text/html; charset=utf-8','.jpeg':'image/jpeg','.jpg':'image/jpeg','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.mp4':'video/mp4','.png':'image/png','.svg':'image/svg+xml; charset=utf-8','.txt':'text/plain; charset=utf-8','.webm':'video/webm','.webp':'image/webp'}; console.log(map[ext] || 'application/octet-stream')" "$FILE")
+            if [[ "$CONTENT_TYPE" == text/* || "$CONTENT_TYPE" == application/json* || "$CONTENT_TYPE" == image/svg+xml* ]]; then
+              node -e "const fs=require('fs'); const filePath=process.argv[1]; const raw=fs.readFileSync(filePath,'utf8'); const patterns=[/sk-ant-/i,/ghp_/i,/gho_/i,/xox/i,/localhost/i,/127\\.0\\.0\\.1/,/\\b10\\.\\d+\\.\\d+\\.\\d+\\b/,/\\b172\\.(1[6-9]|2\\d|3[0-1])\\.\\d+\\.\\d+\\b/,/\\b192\\.168\\.\\d+\\.\\d+\\b/,/\\b100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.\\d+\\.\\d+\\b/,/password\\s*[:=]/i,/secret\\s*[:=]/i,/private key/i]; const hit=patterns.find((pattern)=>pattern.test(raw)); if (hit) throw new Error('Asset safety scan failed for '+filePath+': '+hit);" "$FILE"
+            fi
+            npx wrangler@latest r2 object put "${{ inputs.bucket }}/${KEY}" --file="$FILE" --content-type="$CONTENT_TYPE" --cache-control="public, max-age=31536000, immutable" --remote
+            ASSET_COUNT=$((ASSET_COUNT + 1))
+            echo "Uploaded /${KEY} (${CONTENT_TYPE})"
+          done < <(find "$ASSETS_DIR" -type f -print0)
+
+          echo "Uploaded ${ASSET_COUNT} assets to assets/posts/${SLUG}/"
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+
+      - name: Upload post and updated index to R2
+        id: upload
+        run: |
+          POST_FILE="${{ inputs.post_file }}"
+          SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
+          npx wrangler@latest r2 object put "${{ inputs.bucket }}/posts/${SLUG}.json" --file="$POST_FILE" --remote
+          npx wrangler@latest r2 object put "${{ inputs.bucket }}/posts-index.json" --file=/tmp/posts-index.json --remote
+          echo "post_url=https://blog.minte.dev/posts/${SLUG}" >> "$GITHUB_OUTPUT"
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+
+      - name: Refresh Worker cache after R2 publish
+        run: |
+          if [ -z "${ADMIN_TOKEN:-}" ]; then
+            echo "ADMIN_TOKEN secret is not configured; R2 publish succeeded, site will refresh after Worker cache TTL."
+            exit 0
+          fi
+
+          SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
+          curl --fail-with-body -sS \
+            -X POST \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            "https://blog.minte.dev/admin/purge-cache?slug=${SLUG}"
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+
+      - name: Verify live post asset URLs
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const https = require('https');
+          const postPath = process.env.POST_FILE;
+          const post = JSON.parse(fs.readFileSync(postPath, 'utf8'));
+          const base = 'https://blog.minte.dev';
+          const refs = new Set();
+          if (post.heroImage && post.heroImage.startsWith('/assets/posts/')) refs.add(post.heroImage);
+          const content = String(post.content || '');
+          for (const match of content.matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
+            if (match[1].startsWith('/assets/posts/')) refs.add(match[1]);
+          }
+          for (const match of content.matchAll(/\((\/assets\/posts\/[^\s\)"']+)\)/g)) refs.add(match[1]);
+          if (process.env.ASSETS_DIR && refs.size === 0) {
+            throw new Error('assets_dir was provided but post references no /assets/posts/ URLs');
+          }
+          function fetchOnce(url) {
+            return new Promise((resolve, reject) => {
+              const req = https.get(url, { headers: { 'User-Agent': 'minte-blog-publish-verifier' }, timeout: 15000 }, (res) => {
+                let bytes = 0;
+                res.on('data', (chunk) => { bytes += chunk.length; });
+                res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', bytes }));
+              });
+              req.on('timeout', () => req.destroy(new Error('timeout')));
+              req.on('error', reject);
+            });
+          }
+          async function fetchWithRetry(url) {
+            let last;
+            for (let attempt = 1; attempt <= 6; attempt++) {
+              try {
+                const result = await fetchOnce(url);
+                if (result.status === 200 && result.bytes > 0) return result;
+                last = new Error(`status=${result.status} bytes=${result.bytes} type=${result.type}`);
+              } catch (error) {
+                last = error;
+              }
+              await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
+            }
+            throw last;
+          }
+          (async () => {
+            const postUrl = `${base}/posts/${post.slug}`;
+            const postResult = await fetchWithRetry(postUrl);
+            console.log(`Verified post ${postUrl}: ${postResult.status} ${postResult.type} ${postResult.bytes} bytes`);
+            for (const ref of refs) {
+              const url = `${base}${ref}`;
+              const result = await fetchWithRetry(url);
+              console.log(`Verified asset ${url}: ${result.status} ${result.type} ${result.bytes} bytes`);
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+        env:
+          POST_FILE: ${{ inputs.post_file }}
+          ASSETS_DIR: ${{ inputs.assets_dir }}
+
+      - name: Summary
+        run: |
+          SLUG=$(node -e "console.log(require('./' + process.env.POST_FILE).slug)" )
+          echo "Published: https://blog.minte.dev/posts/${SLUG}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${{ inputs.assets_dir }}" ]; then
+            echo "Assets: https://blog.minte.dev/assets/posts/${SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "R2-only publish: Worker code was not redeployed." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          POST_FILE: ${{ inputs.post_file }}

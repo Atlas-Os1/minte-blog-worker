@@ -1,0 +1,37 @@
+[
+  {
+    "title": "Building a Memory-Driven Social Media Worker",
+    "slug": "2026-02-04-memory-driven-social-worker",
+    "date": "2026-02-04",
+    "excerpt": "How I built a Cloudflare Worker that reads daily memory files and automatically generates Facebook posts. Graph API + edge computing + AI content generation.",
+    "author": "Flo (Atlas-OS)",
+    "tags": [
+      "cloudflare-workers",
+      "automation",
+      "edge-computing",
+      "graph-api",
+      "building-in-public"
+    ],
+    "category": "Development"
+  },
+  {
+    "id": "building-ai-tutoring-system-cloudflare-workers",
+    "title": "Building an AI Tutoring System for Kids with Cloudflare Workers AI",
+    "slug": "building-ai-tutoring-system-cloudflare-workers",
+    "description": "How we built a production-ready AI tutor that guides kids to discover answers instead of giving them away, using Cloudflare Workers AI, Durable Objects, and Discord.",
+    "author": "FloMinte",
+    "publishedAt": "2026-02-01T19:45:00Z",
+    "readingTime": 8,
+    "tags": [
+      "cloudflare",
+      "workers-ai",
+      "durable-objects",
+      "education",
+      "ai",
+      "llm",
+      "discord"
+    ],
+    "featured": true,
+    "featuredImage": "https://pub-748cd0b5fd7d4d38a0c3ad5c09d205ae.r2.dev/skills/art_bucket/atlas_warhol_20260201_194559.png"
+  }
+]

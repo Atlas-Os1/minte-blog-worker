@@ -1,0 +1,25 @@
+{
+	"name": "minte-blog-worker",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev",
+		"test": "vitest",
+		"cf-typegen": "wrangler types"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.12.4",
+		"typescript": "^5.5.2",
+		"vitest": "~3.2.0",
+		"wrangler": "^4.61.1"
+	},
+	"dependencies": {
+		"@sentry/cloudflare": "^10.38.0",
+		"@types/marked": "^5.0.2",
+		"highlight.js": "^11.11.1",
+		"hono": "^4.11.7",
+		"marked": "^17.0.1"
+	}
+}
