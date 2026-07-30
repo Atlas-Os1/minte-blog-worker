@@ -302,13 +302,22 @@ const TOOL_LINKS: ToolLink[] = [
 	},
 ];
 
-function escapeHtml(value: string): string {
-	return value
+function escapeHtml(text: string): string {
+	return text
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
+		.replace(/'/g, '&#039;');
+}
+
+function escapeXml(text: string): string {
+	return text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&apos;');
 }
 
 function normalize(value: string): string {
@@ -1654,16 +1663,19 @@ app.get('/rss.xml', async (c) => {
 
 	const rssItems = publishedPosts
 		.map(
-			(post) => `
+			(post) => {
+				const postUrl = `https://blog.minte.dev/posts/${encodeURIComponent(post.slug)}`;
+				return `
 		<item>
-			<title>${post.title}</title>
-			<link>https://blog.minte.dev/posts/${post.slug}</link>
-			<description>${post.description}</description>
+			<title>${escapeXml(post.title)}</title>
+			<link>${postUrl}</link>
+			<description>${escapeXml(post.description)}</description>
 			<pubDate>${new Date(post.pubDate).toUTCString()}</pubDate>
-			<guid>https://blog.minte.dev/posts/${post.slug}</guid>
-			${post.tags.map((tag) => `<category>${tag}</category>`).join('')}
+			<guid>${postUrl}</guid>
+			${post.tags.map((tag) => `<category>${escapeXml(tag)}</category>`).join('')}
 		</item>
-	`
+	`;
+			}
 		)
 		.join('');
 
