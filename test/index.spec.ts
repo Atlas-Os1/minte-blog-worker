@@ -16,6 +16,23 @@ async function fetchWorker(request: Request, testEnv = env) {
 	return response;
 }
 
+function expectValidRss(xml: string) {
+	expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+	expect(xml).toContain('<rss version="2.0"');
+	expect(xml).toContain('<channel>');
+	expect(xml).toContain('<title>Minte Blog - Building in Public</title>');
+	expect(xml).toContain('<link>https://blog.minte.dev</link>');
+	expect(xml).toContain('<description>Daily updates from Flo\'s development journey</description>');
+	expect(xml).toContain('</channel>');
+	expect(xml).toContain('</rss>');
+	const parserCtor = (globalThis as typeof globalThis & { DOMParser?: new () => { parseFromString: (input: string, type: string) => any } }).DOMParser;
+	if (parserCtor) {
+		const parsed = new parserCtor().parseFromString(xml, 'application/xml');
+		expect(parsed.querySelector('parsererror')?.textContent ?? '').toBe('');
+		expect(parsed.querySelectorAll('channel > title').length).toBe(1);
+	}
+}
+
 describe('Minte Blog worker', () => {
 	it('renders the modern blog shell when no posts are available in the test bucket', async () => {
 		const request = new IncomingRequest('http://example.com/');
@@ -116,5 +133,90 @@ describe('Minte Blog worker', () => {
 
 		expect(response.status).toBe(404);
 		expect(body.error).toBe('No posts available');
+	});
+
+	it('generates RSS 2.0 with required channel and item fields', async () => {
+		await env.BLOG_BUCKET.put('posts-index.json', JSON.stringify({
+			posts: [
+				{
+					slug: 'rss-contract-test',
+					title: 'RSS Contract Test',
+					description: 'A valid RSS item for contract testing.',
+					pubDate: '2026-07-30T12:00:00.000Z',
+					author: 'Dev',
+					tags: ['testing', 'rss'],
+					draft: false,
+				},
+			],
+			tags: { testing: 1, rss: 1 },
+		}));
+
+		const { response, text } = await fetchText('https://example.com/rss.xml');
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('content-type')).toContain('application/rss+xml');
+		expectValidRss(text);
+		expect(text).toContain('<item>');
+		expect(text).toContain('<title>RSS Contract Test</title>');
+		expect(text).toContain('<link>https://blog.minte.dev/posts/rss-contract-test</link>');
+		expect(text).toContain('<description>A valid RSS item for contract testing.</description>');
+		expect(text).toContain('<guid>https://blog.minte.dev/posts/rss-contract-test</guid>');
+		expect(text).toContain('<category>testing</category>');
+	});
+
+	it('escapes RSS item XML and filters draft and memory posts', async () => {
+		await env.BLOG_BUCKET.put('posts-index.json', JSON.stringify({
+			posts: [
+				{
+					slug: 'safe-rss-and-fallback',
+					title: 'AT&T <Workers> "RSS"',
+					description: 'Fallback & observability must stay parseable.',
+					pubDate: '2026-07-30T13:00:00.000Z',
+					author: 'Dev',
+					tags: ['rss & xml'],
+					draft: false,
+				},
+				{
+					slug: 'draft-hidden',
+					title: 'Draft Hidden',
+					description: 'Drafts must not appear in RSS.',
+					pubDate: '2026-07-30T14:00:00.000Z',
+					author: 'Dev',
+					tags: ['draft'],
+					draft: true,
+				},
+				{
+					slug: 'memory-hidden',
+					title: 'Memory Hidden',
+					description: 'Memory posts must not appear in RSS.',
+					pubDate: '2026-07-30T15:00:00.000Z',
+					author: 'Dev',
+					tags: ['memory'],
+					draft: false,
+					category: 'memory',
+				},
+			],
+			tags: { 'rss & xml': 1, draft: 1, memory: 1 },
+		}));
+
+		const { response, text } = await fetchText('https://example.com/rss.xml');
+
+		expect(response.status).toBe(200);
+		expectValidRss(text);
+		expect(text).toContain('<title>AT&amp;T &lt;Workers&gt; &quot;RSS&quot;</title>');
+		expect(text).toContain('<description>Fallback &amp; observability must stay parseable.</description>');
+		expect(text).toContain('<category>rss &amp; xml</category>');
+		expect(text).not.toContain('Draft Hidden');
+		expect(text).not.toContain('Memory Hidden');
+	});
+
+	it('returns empty but valid RSS when the index has no public posts', async () => {
+		await env.BLOG_BUCKET.put('posts-index.json', JSON.stringify({ posts: [], tags: {} }));
+
+		const { response, text } = await fetchText('https://example.com/rss.xml');
+
+		expect(response.status).toBe(200);
+		expectValidRss(text);
+		expect(text).not.toContain('<item>');
 	});
 });
