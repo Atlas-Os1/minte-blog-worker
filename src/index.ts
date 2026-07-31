@@ -77,7 +77,7 @@ type ExportedHandlerScheduledHandler<Env = unknown> = (
 	ctx: ExecutionContext
 ) => void | Promise<void>;
 
-type BlogPost = {
+export type BlogPost = {
 	slug: string;
 	title: string;
 	description: string;
@@ -688,7 +688,7 @@ function assetKind(path: string): 'image' | 'video' | 'embed' | 'file' {
 	return 'file';
 }
 
-function normalizeAssetRef(ref: string, slug: string): string | null {
+export function normalizeAssetRef(ref: string, slug: string): string | null {
 	const cleaned = ref.trim().replace(/[),.;]+$/, '');
 	if (cleaned.startsWith('/assets/posts/')) return cleaned;
 	try {
@@ -703,7 +703,7 @@ function normalizeAssetRef(ref: string, slug: string): string | null {
 	return null;
 }
 
-function collectAssetRefs(post: BlogPost): string[] {
+export function collectAssetRefs(post: BlogPost): string[] {
 	const refs = new Set<string>();
 	if (post.heroImage) {
 		const ref = normalizeAssetRef(post.heroImage, post.slug);
@@ -728,7 +728,7 @@ function collectAssetRefs(post: BlogPost): string[] {
 	return Array.from(refs).filter((ref) => ref.startsWith(`/assets/posts/${post.slug}/`));
 }
 
-function renderAssetGallery(post: BlogPost): string {
+export function renderAssetGallery(post: BlogPost): string {
 	const refs = collectAssetRefs(post);
 	if (refs.length === 0) return '';
 	return `
