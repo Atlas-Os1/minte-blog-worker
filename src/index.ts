@@ -3,17 +3,15 @@ import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import { marked } from 'marked';
 import { cors } from 'hono/cors';
-import { generateBlogPost, generateDetailedBlogDraft, generateMemoryDigestPost, publishPost, saveBlogDraft } from './manual-blog-gen';
+import { generateBlogPost, publishPost } from './manual-blog-gen';
 
 type Bindings = {
 	BLOG_BUCKET: R2Bucket;
 	BLOG_WORKFLOW: Workflow;
-	AI: Ai;
 	CF_ZONE_ID: string;
 	CLOUDFLARE_API_TOKEN: string;
 	GITHUB_TOKEN: string;
 	ADMIN_TOKEN?: string; // Bearer token for admin endpoints
-	DISCORD_WEBHOOK_URL?: string; // Optional Discord webhook for referral notifications
 	MEMORY_PASSWORD?: string; // Optional gate for legacy/private memory archive
 };
 
@@ -87,9 +85,6 @@ type BlogPost = {
 	content: string;
 	draft: boolean;
 	category?: string;
-	type?: 'daily-update' | 'blog-draft' | 'memory';
-	heroImage?: string;
-	assets?: string[];
 };
 
 type PostIndex = {
@@ -107,57 +102,6 @@ type ProjectLink = {
 	accent: string;
 	tags: string[];
 };
-
-type ToolLink = {
-	slug: string;
-	name: string;
-	description: string;
-	url: string;
-	logo: string;
-	logoUrl?: string;
-	accent: string;
-	status?: string;
-	secondaryLabel?: string;
-	secondaryUrl?: string;
-};
-
-type PhotonReferral = {
-	id: string;
-	createdAt: string;
-	status: 'new' | 'reviewed' | 'submitted' | 'confirmed' | 'rejected';
-	statusUpdatedAt?: string;
-	businessName: string;
-	contactName: string;
-	email: string;
-	phone?: string;
-	companySize?: string;
-	notes?: string;
-	marketingConsent: boolean;
-	source: 'photon-referral-form';
-};
-
-const PHOTON_REFERRAL_STATUSES: PhotonReferral['status'][] = ['new', 'reviewed', 'submitted', 'confirmed', 'rejected'];
-const PHOTON_REFERRAL_PREFIX = 'referrals/photon/';
-const PHOTON_ADMIN_COOKIE = 'photon_admin';
-
-function isPhotonReferralStatus(value: string): value is PhotonReferral['status'] {
-	return PHOTON_REFERRAL_STATUSES.includes(value as PhotonReferral['status']);
-}
-
-function getPhotonAdminToken(c: { req: { header: (name: string) => string | undefined; query: (name: string) => string | undefined } }): string | undefined {
-	const authHeader = c.req.header('Authorization') || '';
-	const bearerToken = authHeader.match(/^Bearer\s+(.+)$/i)?.[1];
-	const cookieToken = getCookie(c.req.header('Cookie'), PHOTON_ADMIN_COOKIE);
-	return bearerToken || c.req.query('token') || (cookieToken ? decodeURIComponent(cookieToken) : undefined);
-}
-
-function isPhotonAdminAuthorized(c: { req: { header: (name: string) => string | undefined; query: (name: string) => string | undefined } }, env: { ADMIN_TOKEN?: string }): boolean {
-	return Boolean(env.ADMIN_TOKEN && getPhotonAdminToken(c) === env.ADMIN_TOKEN);
-}
-
-function buildPhotonAdminCookie(token: string, secure: boolean): string {
-	return `${PHOTON_ADMIN_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${secure ? '; Secure' : ''}`;
-}
 
 const MINTE_FAVICON_URL = 'https://pub-0be86ba29d2f4e66b59fe97deb2ea9d3.r2.dev/assets/favicon.png';
 
@@ -215,93 +159,6 @@ const PROJECTS: ProjectLink[] = [
 	},
 ];
 
-const TOOL_LINKS: ToolLink[] = [
-	{
-		slug: 'photon-codes',
-		name: 'Photon Codes',
-		description: 'Code workflow slot reserved while the referral intake is handled on our side.',
-		url: 'https://photon.codes/',
-		logo: 'PC',
-		logoUrl: 'https://app.photon.codes/icon0.svg?icon0.38661a6d.svg',
-		accent: '#f97316',
-		status: 'Referral intake live',
-		secondaryLabel: 'Referral form',
-		secondaryUrl: '/photon-referral',
-	},
-	{
-		slug: 'cloudflare',
-		name: 'Cloudflare',
-		description: 'Workers, R2, Workflows, DNS, caching, and the edge runtime behind this blog.',
-		url: 'https://www.cloudflare.com/',
-		logo: 'CF',
-		logoUrl: 'https://www.cloudflare.com/favicon.ico',
-		accent: '#f6821f',
-	},
-	{
-		slug: 'cloudflare-developers',
-		name: 'Cloudflare Developers',
-		description: 'The developer platform docs and products used for Workers-native builds.',
-		url: 'https://developers.cloudflare.com/',
-		logo: 'DEV',
-		logoUrl: 'https://developers.cloudflare.com/favicon.ico',
-		accent: '#facc15',
-	},
-	{
-		slug: 'hermes',
-		name: 'Hermes Agent',
-		description: 'The agent runtime coordinating coding, memory, publishing, and operations workflows.',
-		url: 'https://hermes-agent.nousresearch.com/',
-		logo: 'H',
-		logoUrl: 'https://hermes-agent.nousresearch.com/favicon.ico',
-		accent: '#8b5cf6',
-	},
-	{
-		slug: 'github',
-		name: 'GitHub',
-		description: 'Source control, issues, Actions, and the public repos that make the work inspectable.',
-		url: 'https://github.com/Atlas-Os1',
-		logo: 'GH',
-		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
-		accent: '#24292f',
-	},
-	{
-		slug: 'openmontage',
-		name: 'OpenMontage',
-		description: 'Open creative/media tooling and experiments from the Atlas-OS workspace.',
-		url: 'https://github.com/Atlas-Os1/OpenMontage',
-		logo: 'OM',
-		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
-		accent: '#f472b6',
-	},
-	{
-		slug: 'opencode',
-		name: 'OpenCode',
-		description: 'Terminal-native coding agent workflow used for implementation and review loops.',
-		url: 'https://github.com/anomalyco/opencode',
-		logo: 'OC',
-		logoUrl: 'https://github.githubassets.com/favicons/favicon.svg',
-		accent: '#22c55e',
-	},
-	{
-		slug: 'anthropic',
-		name: 'Anthropic',
-		description: 'Claude models for long-context reasoning, coding assistance, and review support.',
-		url: 'https://www.anthropic.com/',
-		logo: 'A',
-		logoUrl: 'https://www.anthropic.com/favicon.ico',
-		accent: '#d97757',
-	},
-	{
-		slug: 'openai',
-		name: 'OpenAI',
-		description: 'Models and APIs used across agent, coding, and automation experiments.',
-		url: 'https://openai.com/',
-		logo: 'AI',
-		logoUrl: 'https://openai.com/favicon.ico',
-		accent: '#10a37f',
-	},
-];
-
 function escapeHtml(value: string): string {
 	return value
 		.replace(/&/g, '&amp;')
@@ -313,287 +170,6 @@ function escapeHtml(value: string): string {
 
 function normalize(value: string): string {
 	return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-function slugify(value: string): string {
-	return normalize(value || 'referral').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'referral';
-}
-
-function readFormValue(formData: FormData, name: string): string {
-	const value = formData.get(name);
-	return typeof value === 'string' ? value.trim() : '';
-}
-
-function buildPhotonReferralId(businessName: string): string {
-	return `${new Date().toISOString().replace(/[:.]/g, '-')}-${slugify(businessName)}`;
-}
-
-function buildPhotonReferralSummary(referral: PhotonReferral, extraLines: string[] = []): string {
-	const notes = referral.notes ? referral.notes.slice(0, 800) : 'No notes provided.';
-	return [
-		`Business: ${referral.businessName}`,
-		`Contact: ${referral.contactName} <${referral.email}>`,
-		referral.phone ? `Phone: ${referral.phone}` : null,
-		referral.companySize ? `Company size: ${referral.companySize}` : null,
-		`Status: ${referral.status}`,
-		referral.statusUpdatedAt ? `Status updated: ${new Date(referral.statusUpdatedAt).toLocaleString()}` : null,
-		`Consent: ${referral.marketingConsent ? 'yes' : 'no'}`,
-		`Notes: ${notes}`,
-		...extraLines,
-	].filter(Boolean).join('\n');
-}
-
-async function sendPhotonReferralDiscordNotification(env: Bindings, payload: Record<string, unknown>): Promise<void> {
-	if (!env.DISCORD_WEBHOOK_URL) return;
-	try {
-		const response = await fetch(env.DISCORD_WEBHOOK_URL, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(payload),
-		});
-		if (!response.ok) {
-			console.warn('[Photon Referral] Discord notification failed:', response.status);
-		}
-	} catch (error) {
-		console.warn('[Photon Referral] Discord notification error:', error instanceof Error ? error.message : String(error));
-	}
-}
-
-async function notifyPhotonReferral(referral: PhotonReferral, env: Bindings): Promise<void> {
-	const summary = buildPhotonReferralSummary(referral, ['Admin queue: https://blog.minte.dev/admin/photon-referrals']);
-	await sendPhotonReferralDiscordNotification(env, {
-		content: `📣 **Photon referral received:** ${referral.businessName}`,
-		allowed_mentions: { parse: [] },
-		embeds: [{
-			title: 'Photon referral submitted',
-			description: summary,
-			color: 0xf97316,
-			fields: [
-				{ name: 'Business', value: referral.businessName.slice(0, 1024), inline: true },
-				{ name: 'Contact', value: referral.contactName.slice(0, 1024), inline: true },
-				{ name: 'Email', value: referral.email.slice(0, 1024), inline: true },
-			],
-			timestamp: referral.createdAt,
-			footer: { text: 'Minte Blog · Photon intake' },
-		}],
-	});
-}
-
-async function notifyPhotonReferralStatusChange(referral: PhotonReferral, env: Bindings, previousStatus: PhotonReferral['status']): Promise<void> {
-	const headline = `Photon referral marked ${referral.status}`;
-	const summary = buildPhotonReferralSummary(referral, [
-		`Previous status: ${previousStatus}`,
-		`Admin queue: https://blog.minte.dev/admin/photon-referrals`,
-	]);
-	await sendPhotonReferralDiscordNotification(env, {
-		content: `🔁 **Photon referral status updated:** ${referral.businessName} → ${referral.status}`,
-		allowed_mentions: { parse: [] },
-		embeds: [{
-			title: headline,
-			description: summary,
-			color: referral.status === 'confirmed' ? 0x22c55e : referral.status === 'rejected' ? 0xef4444 : referral.status === 'submitted' ? 0x3b82f6 : referral.status === 'reviewed' ? 0xa855f7 : 0xf97316,
-			fields: [
-				{ name: 'Business', value: referral.businessName.slice(0, 1024), inline: true },
-				{ name: 'Contact', value: referral.contactName.slice(0, 1024), inline: true },
-				{ name: 'Email', value: referral.email.slice(0, 1024), inline: true },
-				{ name: 'Status', value: referral.status, inline: true },
-			],
-			timestamp: referral.statusUpdatedAt || referral.createdAt,
-			footer: { text: 'Minte Blog · Photon admin' },
-		}],
-	});
-}
-
-function renderPhotonReferralForm(values: Partial<PhotonReferral> = {}, error?: string): string {
-	return `
-		<section class="hero">
-			<div class="hero-grid">
-				<div>
-					<p class="eyebrow">Photon referral intake</p>
-					<h1>Refer a business for Photon’s 15% offer.</h1>
-					<p class="lede">Photon’s referral flow is submitted, then confirmed by their team. We collect the lead here, review it, and then submit it to Photon for you.</p>
-					<div class="hero-actions">
-						<a class="btn primary" href="#photon-referral-form">Submit referral</a>
-						<a class="btn" href="https://refer.photon.codes/" target="_blank" rel="noopener">Photon referral terms</a>
-					</div>
-				</div>
-				<div class="hero-panel">
-					<div class="metric"><span>Business gets</span><strong>15% off first month</strong></div>
-					<div class="metric"><span>You earn</span><strong>15% for 12 months</strong></div>
-					<div class="metric"><span>Photon asks for</span><strong>company name + who to talk to</strong></div>
-					<div class="metric"><span>Status</span><strong>Reviewed before submission</strong></div>
-				</div>
-			</div>
-		</section>
-		<section class="section" id="photon-referral-form">
-			<div class="section-heading">
-				<div>
-					<p class="eyebrow">Intake form</p>
-					<h2>Send us the business details</h2>
-				</div>
-				<p>We’ll review the lead and submit it to Photon manually, so the intro stays accurate and consented.</p>
-			</div>
-			${error ? `<div class="form-alert error">${escapeHtml(error)}</div>` : ''}
-			<form class="referral-form" method="post" action="/photon-referral">
-				<label>
-					<span>Business name *</span>
-					<input name="businessName" required value="${escapeHtml(values.businessName || '')}" placeholder="Company or shop name">
-				</label>
-				<label>
-					<span>Contact person *</span>
-					<input name="contactName" required value="${escapeHtml(values.contactName || '')}" placeholder="Who we should talk to">
-				</label>
-				<label>
-					<span>Email *</span>
-					<input name="email" type="email" required value="${escapeHtml(values.email || '')}" placeholder="name@company.com">
-				</label>
-				<label>
-					<span>Phone</span>
-					<input name="phone" type="tel" value="${escapeHtml(values.phone || '')}" placeholder="Optional">
-				</label>
-				<label>
-					<span>Business size</span>
-					<select name="companySize">
-						${['1-10 employees', '11-50 employees', '51-200 employees', '200+ employees', 'Not sure'].map((option) => `<option value="${escapeHtml(option)}" ${values.companySize === option ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
-					</select>
-				</label>
-				<label class="field-full">
-					<span>Notes / context</span>
-					<textarea name="notes" rows="6" placeholder="Why this business is a fit, the right contact, timing, etc.">${escapeHtml(values.notes || '')}</textarea>
-				</label>
-				<label class="field-full consent-row">
-					<input type="checkbox" name="marketingConsent" value="yes" ${values.marketingConsent ? 'checked' : ''} required>
-					<span>I confirm the business wants us to submit this referral to Photon and follow up about the offer.</span>
-				</label>
-				<div class="form-actions field-full">
-					<button class="btn primary" type="submit">Save referral</button>
-					<a class="btn" href="/">Back to blog</a>
-				</div>
-			</form>
-		</section>
-	`;
-}
-
-function renderPhotonReferralSuccess(referral: PhotonReferral): string {
-	return `
-		<section class="hero">
-			<div class="hero-grid">
-				<div>
-					<p class="eyebrow">Referral saved</p>
-					<h1>We’ve got it.</h1>
-					<p class="lede">We’ll review ${escapeHtml(referral.businessName)} and submit the referral to Photon using the contact details you provided.</p>
-					<div class="hero-actions">
-						<a class="btn primary" href="/photon-referral">Submit another</a>
-						<a class="btn" href="/">Back to blog</a>
-					</div>
-				</div>
-				<div class="hero-panel">
-					<div class="metric"><span>Business</span><strong>${escapeHtml(referral.businessName)}</strong></div>
-					<div class="metric"><span>Contact</span><strong>${escapeHtml(referral.contactName)}</strong></div>
-					<div class="metric"><span>Email</span><strong>${escapeHtml(referral.email)}</strong></div>
-					<div class="metric"><span>Status</span><strong>Queued for review</strong></div>
-				</div>
-			</div>
-		</section>
-	`;
-}
-
-function renderPhotonReferralAdmin(referrals: PhotonReferral[]): string {
-	const rows = referrals.map((referral) => `
-		<tr>
-			<td>${escapeHtml(new Date(referral.createdAt).toLocaleString())}</td>
-			<td>
-				<strong>${escapeHtml(referral.businessName)}</strong>
-				<div style="color: var(--text-secondary); font-size: .88rem;">${escapeHtml(referral.companySize || 'Not provided')}</div>
-			</td>
-			<td>
-				${escapeHtml(referral.contactName)}
-				<div style="color: var(--text-secondary); font-size: .88rem;">${escapeHtml(referral.email)}</div>
-			</td>
-			<td>${escapeHtml(referral.phone || '—')}</td>
-			<td>${escapeHtml(referral.notes || '—')}</td>
-			<td>
-				<div class="admin-status-stack">
-					<span class="tag">${escapeHtml(referral.status)}</span>
-					${referral.statusUpdatedAt ? `<small>Updated ${escapeHtml(new Date(referral.statusUpdatedAt).toLocaleString())}</small>` : ''}
-				</div>
-			</td>
-			<td>
-				<form class="admin-status-form" method="post" action="/admin/photon-referrals/${encodeURIComponent(referral.id)}/status">
-					<select name="status" aria-label="Update status for ${escapeHtml(referral.businessName)}">
-						${PHOTON_REFERRAL_STATUSES.map((status) => `<option value="${status}" ${referral.status === status ? 'selected' : ''}>${status}</option>`).join('')}
-					</select>
-					<button class="btn" type="submit">Save</button>
-				</form>
-			</td>
-		</tr>
-	`).join('');
-	return `
-		<section class="section">
-			<div class="section-heading">
-				<div>
-					<p class="eyebrow">Admin review</p>
-					<h1>Photon referrals</h1>
-				</div>
-				<p>${referrals.length} referral(s) in queue.</p>
-			</div>
-			<div style="overflow-x:auto;">
-				<table class="referral-table">
-					<thead>
-						<tr>
-							<th>Created</th><th>Business</th><th>Contact</th><th>Phone</th><th>Notes</th><th>Status</th><th>Action</th>
-						</tr>
-					</thead>
-					<tbody>${rows || '<tr><td colspan="7">No referrals yet.</td></tr>'}</tbody>
-				</table>
-			</div>
-		</section>
-	`;
-}
-
-async function loadPhotonReferrals(bucket: R2Bucket, limit = 25): Promise<PhotonReferral[]> {
-	const listed = await bucket.list({ prefix: PHOTON_REFERRAL_PREFIX, limit });
-	const referrals = await Promise.all(listed.objects.map(async (object) => {
-		try {
-			const file = await bucket.get(object.key);
-			if (!file) return null;
-			return JSON.parse(await file.text()) as PhotonReferral;
-		} catch {
-			return null;
-		}
-	}));
-	return referrals.filter((referral): referral is PhotonReferral => Boolean(referral))
-		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-}
-
-function photonReferralKey(id: string): string {
-	return `${PHOTON_REFERRAL_PREFIX}${id}.json`;
-}
-
-async function loadPhotonReferral(bucket: R2Bucket, id: string): Promise<PhotonReferral | null> {
-	const file = await bucket.get(photonReferralKey(id));
-	if (!file) return null;
-	try {
-		return JSON.parse(await file.text()) as PhotonReferral;
-	} catch {
-		return null;
-	}
-}
-
-async function savePhotonReferral(bucket: R2Bucket, referral: PhotonReferral): Promise<void> {
-	await bucket.put(photonReferralKey(referral.id), JSON.stringify(referral, null, 2), {
-		httpMetadata: { contentType: 'application/json' },
-	});
-}
-
-async function updatePhotonReferralStatus(bucket: R2Bucket, id: string, status: PhotonReferral['status']): Promise<{ referral: PhotonReferral | null; previousStatus?: PhotonReferral['status'] }> {
-	const referral = await loadPhotonReferral(bucket, id);
-	if (!referral) return { referral: null };
-	const previousStatus = referral.status;
-	referral.status = status;
-	referral.statusUpdatedAt = new Date().toISOString();
-	await savePhotonReferral(bucket, referral);
-	return { referral, previousStatus };
 }
 
 function inferProject(post: Omit<BlogPost, 'content'> | BlogPost): ProjectLink {
@@ -640,115 +216,48 @@ function addHeadingIds(html: string): string {
 	});
 }
 
-function enhanceRenderedMedia(html: string): string {
-	return html.replace(/<p>\s*(<img\s+[^>]*src="([^"]+)"[^>]*>)\s*<\/p>/g, (_match, imageTag: string, src: string) => {
-		const labelMatch = imageTag.match(/alt="([^"]*)"/);
-		const label = labelMatch?.[1] ? escapeHtml(labelMatch[1]) : 'Post attachment';
-		const isWideDiagram = /\.svg(?:$|[?#])/i.test(src) || src.includes('/assets/posts/');
-		if (!isWideDiagram) {
-			return `<figure class="media-frame">${imageTag}<figcaption>${label}</figcaption></figure>`;
+function isWideMediaSource(src: string): boolean {
+	return /\/assets\/(posts|branding)\//i.test(src) || /\.svg(?:$|[?#])/i.test(src);
+}
+
+export function enhanceRenderedMedia(html: string): string {
+	return html.replace(/<p>\s*(<img\b[^>]*>)\s*<\/p>/gi, (_match, imageTag: string) => {
+		const srcMatch = imageTag.match(/\ssrc=["']([^"']+)["']/i);
+		const altMatch = imageTag.match(/\salt=["']([^"']*)["']/i);
+		const src = srcMatch?.[1] || '';
+		const label = altMatch?.[1]?.trim() || 'Post attachment';
+		const caption = isWideMediaSource(src)
+			? `${escapeHtml(label)} · swipe sideways or <a href="${escapeHtml(src)}" target="_blank" rel="noopener">open full size</a>`
+			: escapeHtml(label);
+
+		if (isWideMediaSource(src)) {
+			return `<figure class="media-frame wide-media-frame"><div class="media-scroll" tabindex="0" aria-label="Scrollable media: ${escapeHtml(label)}">${imageTag}</div><figcaption>${caption}</figcaption></figure>`;
 		}
-		return `<figure class="media-frame wide-media-frame"><div class="media-scroll" tabindex="0" aria-label="Scrollable media: ${label}">${imageTag}</div><figcaption>${label} · swipe sideways or <a href="${src}" target="_blank" rel="noopener">open full size</a></figcaption></figure>`;
+
+		return `<figure class="media-frame">${imageTag}<figcaption>${caption}</figcaption></figure>`;
 	});
+}
+
+export function guessAssetContentType(path: string): string {
+	const lower = path.toLowerCase();
+	if (lower.endsWith('.svg')) return 'image/svg+xml';
+	if (lower.endsWith('.png')) return 'image/png';
+	if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+	if (lower.endsWith('.webp')) return 'image/webp';
+	if (lower.endsWith('.gif')) return 'image/gif';
+	if (lower.endsWith('.avif')) return 'image/avif';
+	if (lower.endsWith('.mp4')) return 'video/mp4';
+	if (lower.endsWith('.webm')) return 'video/webm';
+	if (lower.endsWith('.json')) return 'application/json; charset=utf-8';
+	if (lower.endsWith('.xml')) return 'application/xml; charset=utf-8';
+	if (lower.endsWith('.txt')) return 'text/plain; charset=utf-8';
+	if (lower.endsWith('.css')) return 'text/css; charset=utf-8';
+	if (lower.endsWith('.js')) return 'text/javascript; charset=utf-8';
+	return 'application/octet-stream';
 }
 
 function renderTags(tags: string[]): string {
 	return tags.map((tag) => `<a href="/tags/${encodeURIComponent(tag)}" class="tag" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</a>`).join('');
-}
-
-
-function assetContentType(path: string): string {
-	const cleanPath = path.split('?')[0].toLowerCase();
-	const ext = cleanPath.slice(cleanPath.lastIndexOf('.'));
-	const map: Record<string, string> = {
-		'.avif': 'image/avif',
-		'.css': 'text/css; charset=utf-8',
-		'.gif': 'image/gif',
-		'.htm': 'text/html; charset=utf-8',
-		'.html': 'text/html; charset=utf-8',
-		'.jpeg': 'image/jpeg',
-		'.jpg': 'image/jpeg',
-		'.js': 'text/javascript; charset=utf-8',
-		'.json': 'application/json; charset=utf-8',
-		'.mp4': 'video/mp4',
-		'.png': 'image/png',
-		'.svg': 'image/svg+xml; charset=utf-8',
-		'.txt': 'text/plain; charset=utf-8',
-		'.webm': 'video/webm',
-		'.webp': 'image/webp',
-	};
-	return map[ext] || 'application/octet-stream';
-}
-
-function assetKind(path: string): 'image' | 'video' | 'embed' | 'file' {
-	const type = assetContentType(path);
-	if (type.startsWith('image/')) return 'image';
-	if (type.startsWith('video/')) return 'video';
-	if (type.startsWith('text/html')) return 'embed';
-	return 'file';
-}
-
-function normalizeAssetRef(ref: string, slug: string): string | null {
-	const cleaned = ref.trim().replace(/[),.;]+$/, '');
-	if (cleaned.startsWith('/assets/posts/')) return cleaned;
-	try {
-		const url = new URL(cleaned);
-		if (url.hostname === 'blog.minte.dev' && url.pathname.startsWith('/assets/posts/')) return url.pathname;
-	} catch {
-		// Not an absolute URL.
-	}
-	if (/^[\w./ -]+\.(svg|png|jpe?g|gif|webp|avif|mp4|webm|html?)$/i.test(cleaned) && !cleaned.includes('..')) {
-		return `/assets/posts/${slug}/${cleaned.replace(/^\.\//, '')}`;
-	}
-	return null;
-}
-
-function collectAssetRefs(post: BlogPost): string[] {
-	const refs = new Set<string>();
-	if (post.heroImage) {
-		const ref = normalizeAssetRef(post.heroImage, post.slug);
-		if (ref) refs.add(ref);
-	}
-	for (const asset of post.assets || []) {
-		const ref = normalizeAssetRef(asset, post.slug);
-		if (ref) refs.add(ref);
-	}
-	const content = post.content || '';
-	const patterns = [
-		/(?:src|href)=["']([^"']+)["']/g,
-		/\((\/assets\/posts\/[^\s\)"']+)\)/g,
-		/(https:\/\/blog\.minte\.dev\/assets\/posts\/[^\s`"'<>]+)/g,
-	];
-	for (const pattern of patterns) {
-		for (const match of content.matchAll(pattern)) {
-			const ref = normalizeAssetRef(match[1], post.slug);
-			if (ref) refs.add(ref);
-		}
-	}
-	return Array.from(refs).filter((ref) => ref.startsWith(`/assets/posts/${post.slug}/`));
-}
-
-function renderAssetGallery(post: BlogPost): string {
-	const refs = collectAssetRefs(post);
-	if (refs.length === 0) return '';
-	return `
-		<section class="asset-gallery" aria-label="Post asset bundle">
-			<div class="section-heading compact">
-				<div>
-					<p class="eyebrow">Attachment bundle</p>
-					<h2>Files attached to this build note</h2>
-				</div>
-				<p>Compact links to the R2 bundle. Inline diagrams stay scrollable above instead of being duplicated as oversized cards.</p>
-			</div>
-			<div class="asset-link-grid">
-				${refs.map((ref) => {
-					const kind = assetKind(ref);
-					const label = decodeURIComponent(ref.split('/').pop() || ref);
-					const icon = kind === 'video' ? '▶' : kind === 'image' ? '▧' : kind === 'embed' ? '⌁' : '↗';
-					return `<a class="asset-link-card" href="${ref}" target="_blank" rel="noopener"><span class="asset-icon">${icon}</span><span><strong>${escapeHtml(label)}</strong><small>${kind} attachment</small></span></a>`;
-				}).join('')}
-			</div>
-		</section>`;
 }
 
 function renderProjectCard(project: ProjectLink, compact = false): string {
@@ -766,29 +275,6 @@ function renderProjectCard(project: ProjectLink, compact = false): string {
 			<div class="project-actions">
 				${project.site ? `<a href="${project.site}" target="_blank" rel="noopener">Site</a>` : ''}
 				<a href="${project.repo}" target="_blank" rel="noopener">GitHub</a>
-			</div>
-		</article>`;
-}
-
-
-function renderToolCard(tool: ToolLink): string {
-	return `
-		<article class="tool-card reveal-card" data-reveal-card style="--tool-accent: ${tool.accent}; --project-accent: ${tool.accent}">
-			<div class="card-ambient" aria-hidden="true"></div>
-			<div class="tool-logo" aria-hidden="true">${tool.logoUrl ? `<img src="${tool.logoUrl}" alt="" loading="lazy" onerror="this.remove(); this.parentElement.textContent='${escapeHtml(tool.logo)}';">` : escapeHtml(tool.logo)}</div>
-			<div>
-				<div class="tool-title-row">
-					<h3>${escapeHtml(tool.name)}</h3>
-					<span>↗</span>
-				</div>
-				<p>${escapeHtml(tool.description)}</p>
-				<div class="tool-actions-row">
-					${tool.status ? `<span class="tool-status">${escapeHtml(tool.status)}</span>` : ''}
-					<div class="tool-action-links">
-						<a href="${tool.url}" target="_blank" rel="noopener">Open</a>
-						${tool.secondaryUrl ? `<a href="${tool.secondaryUrl}" ${tool.secondaryUrl.startsWith('/') ? '' : 'target="_blank" rel="noopener"'}>${escapeHtml(tool.secondaryLabel || 'Open referral form')}</a>` : ''}
-					</div>
-				</div>
 			</div>
 		</article>`;
 }
@@ -907,7 +393,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 			--shadow: 0 22px 80px rgba(0, 0, 0, 0.38);
 		}
 		* { margin: 0; padding: 0; box-sizing: border-box; }
-		html { scroll-behavior: smooth; overflow-x: clip; }
+		html { scroll-behavior: smooth; }
 		body {
 			font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 			line-height: 1.7;
@@ -917,12 +403,12 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 				radial-gradient(circle at top right, rgba(22,199,168,.2), transparent 28rem),
 				var(--bg-primary);
 			min-height: 100vh;
-			overflow-x: clip;
 			transition: background 0.3s, color 0.3s;
 		}
 		a { color: inherit; text-decoration: none; }
 		a:hover { color: var(--accent); }
 		img { max-width: 100%; height: auto; border-radius: 18px; }
+		picture { display: block; max-width: 100%; }
 		.container { width: min(1180px, calc(100% - 32px)); max-width: 100%; margin: 0 auto; padding: 24px 0 56px; overflow-x: clip; }
 		.nav {
 			position: sticky; top: 12px; z-index: 50; margin-bottom: 36px;
@@ -966,25 +452,11 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.section-heading { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 18px; }
 		.section-heading p { color: var(--text-secondary); max-width: 65ch; }
 		.project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-		.tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
 		.project-card { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-height: 220px; padding: 22px; border: 1px solid var(--border); border-radius: 24px; background: var(--surface); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
 		.project-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 4px; background: var(--project-accent); }
 		.project-card:hover { transform: translateY(-5px); border-color: var(--project-accent); box-shadow: 0 18px 50px rgba(15,23,42,.12); }
 		.project-card p { color: var(--text-secondary); }
 		.project-card.compact { min-height: auto; }
-		.tool-card { position: relative; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: start; min-height: 168px; padding: 18px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
-		.tool-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tool-accent); }
-		.tool-card:hover { transform: translateY(-5px); border-color: var(--tool-accent); box-shadow: 0 18px 50px color-mix(in srgb, var(--tool-accent), transparent 82%); }
-		.tool-card .card-ambient { background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--tool-accent), transparent 52%), transparent 44%); }
-		.tool-logo { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; color: white; background: linear-gradient(135deg, var(--tool-accent), color-mix(in srgb, var(--tool-accent), #020617 22%)); font-weight: 900; letter-spacing: -.04em; box-shadow: 0 14px 32px color-mix(in srgb, var(--tool-accent), transparent 72%); }
-		.tool-logo img { width: 28px; height: 28px; border-radius: 7px; object-fit: contain; background: rgba(255,255,255,.92); padding: 3px; }
-		.tool-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-		.tool-card p { color: var(--text-secondary); margin-top: 7px; }
-		.tool-actions-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
-		.tool-action-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-		.tool-action-links a { display: inline-flex; align-items: center; justify-content: center; padding: 8px 11px; border-radius: 999px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface-strong), white 10%); color: var(--text-primary); font-size: .84rem; font-weight: 800; }
-		.tool-action-links a:hover { border-color: var(--tool-accent); color: var(--tool-accent); }
-		.tool-status { display: inline-flex; width: fit-content; padding: 5px 9px; border-radius: 999px; color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent), transparent 86%); font-size: .78rem; font-weight: 800; }
 		.controls { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 18px; }
 		.search-box { width: 100%; min-height: 48px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-strong); color: var(--text-primary); padding: 0 16px; font: inherit; }
 		.filter-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1027,57 +499,34 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.no-results { display: none; padding: 24px; border: 1px dashed var(--border); border-radius: 20px; color: var(--text-secondary); text-align: center; }
 		.progress { position: fixed; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transform-origin: left; transform: scaleX(0); z-index: 2000; }
 		.article-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 30px; align-items: start; }
-		.article-layout > * { min-width: 0; }
 		.article-shell { min-width: 0; padding: clamp(24px, 5vw, 52px); border: 1px solid var(--border); border-radius: 32px; background: var(--surface); box-shadow: var(--shadow); }
-		.article-shell h1, .article-shell h2, .article-shell h3 { overflow-wrap: anywhere; text-wrap: balance; }
-		.article-shell h1 { font-size: clamp(2.05rem, 4.7vw, 4.1rem); line-height: 1.04; }
+		.article-shell h1, .article-shell h2, .article-shell h3 { overflow-wrap: anywhere; }
+		.article-shell h1 { font-size: clamp(2.15rem, 5vw, 4.2rem); }
 		.article-description { color: var(--text-secondary); font-size: 1.12rem; margin: 16px 0; }
-		.post-content { font-size: 1.06rem; min-width: 0; overflow-wrap: anywhere; }
+		.post-content { font-size: 1.06rem; min-width: 0; }
+		.post-content img { display: block; max-width: 100%; height: auto; }
 		.post-content h2, .post-content h3 { scroll-margin-top: 96px; margin-top: 2.1em; }
 		.post-content p { margin: 1.05em 0; }
 		.post-content a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 		.post-content ul, .post-content ol { margin: 1em 0 1em 1.4em; }
 		.post-content blockquote { border-left: 4px solid var(--accent); padding: 14px 0 14px 18px; margin: 24px 0; color: var(--text-secondary); background: var(--muted); border-radius: 0 16px 16px 0; }
 		.post-content figure { margin: 28px 0; padding: 12px; border: 1px solid var(--border); border-radius: 24px; background: var(--surface-strong); box-shadow: 0 16px 50px rgba(15,23,42,.08); }
+		.post-content figure.media-frame { overflow: hidden; }
+		.post-content figure.wide-media-frame { padding: 10px; }
+		.post-content figure.wide-media-frame figcaption { padding-inline: 4px; }
+		.post-content .media-scroll {
+			max-width: 100%;
+			overflow-x: auto;
+			overflow-y: hidden;
+			-webkit-overflow-scrolling: touch;
+			overscroll-behavior-inline: contain;
+			border-radius: 18px;
+		}
+		.post-content .media-scroll img { display: block; width: 100%; height: auto; }
 		.post-content figcaption { color: var(--text-secondary); font-size: .9rem; margin: 10px 4px 2px; }
 		.post-content iframe { width: 100%; min-height: min(76vh, 720px); border: 1px solid var(--border); border-radius: 22px; background: var(--bg-secondary); box-shadow: 0 16px 50px rgba(15,23,42,.12); }
 		.post-content .interactive-embed { margin: 32px 0; }
 		.post-content .interactive-embed iframe { display: block; aspect-ratio: 16 / 10; min-height: 460px; }
-		.post-content img, .post-content video { display: block; width: 100%; max-width: 100%; height: auto; }
-		.post-content video { border-radius: 18px; margin: 24px 0; background: #000; box-shadow: 0 16px 50px rgba(15,23,42,.12); }
-		.media-frame { overflow: hidden; }
-		.media-frame > img { border-radius: 16px; }
-		.media-scroll { max-width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-inline: contain; border-radius: 16px; }
-		.media-scroll:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
-		.media-scroll img { width: 100%; max-width: 100%; min-width: 0; border-radius: 16px; }
-		.asset-gallery { margin-top: 34px; padding-top: 24px; border-top: 1px solid var(--border); }
-		.section-heading.compact { align-items: start; }
-		.asset-link-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 14px; }
-		.asset-link-card { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-strong); text-decoration: none; }
-		.asset-link-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-		.asset-link-card small { display: block; color: var(--text-secondary); font-size: .78rem; }
-		.asset-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: white; background: var(--accent); font-weight: 900; }
-		.referral-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 24px; border: 1px solid var(--border); border-radius: 28px; background: var(--surface); box-shadow: 0 16px 50px rgba(15,23,42,.08); }
-		.referral-form label { display: grid; gap: 8px; }
-		.referral-form span { font-weight: 700; color: var(--text-primary); }
-		.referral-form input, .referral-form textarea, .referral-form select { width: 100%; min-height: 48px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface-strong); color: var(--text-primary); font: inherit; }
-		.referral-form textarea { min-height: 140px; resize: vertical; }
-		.field-full { grid-column: 1 / -1; }
-		.consent-row { display: flex !important; align-items: flex-start; gap: 12px; }
-		.consent-row input { width: 20px; height: 20px; min-height: 20px; margin-top: 4px; }
-		.consent-row span { font-weight: 600; color: var(--text-secondary); }
-		.form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-		.form-alert { padding: 14px 16px; border-radius: 18px; margin-bottom: 14px; }
-		.form-alert.error { background: color-mix(in srgb, #ef4444, transparent 90%); border: 1px solid color-mix(in srgb, #ef4444, transparent 65%); color: #b91c1c; }
-		.form-alert.success { background: color-mix(in srgb, #16a34a, transparent 90%); border: 1px solid color-mix(in srgb, #16a34a, transparent 65%); color: #166534; }
-		.referral-table { width: 100%; border-collapse: collapse; min-width: 900px; }
-		.referral-table th, .referral-table td { text-align: left; vertical-align: top; padding: 14px 12px; border-bottom: 1px solid var(--border); }
-		.referral-table th { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary); }
-		.admin-status-stack { display: grid; gap: 6px; }
-		.admin-status-stack small { color: var(--text-secondary); font-size: .78rem; }
-		.admin-status-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-		.admin-status-form select { min-height: 40px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-strong); color: var(--text-primary); font: inherit; }
-		.admin-status-form .btn { min-height: 40px; padding: 8px 12px; }
 		pre { background: var(--code-bg); padding: 18px; border-radius: 18px; overflow-x: auto; margin: 22px 0; }
 		code { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace; font-size: .92rem; }
 		.toc-stack { position: sticky; top: 96px; display: grid; gap: 16px; }
@@ -1094,7 +543,7 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 		.footer a { display: block; color: var(--text-secondary); margin: 7px 0; }
 		.footer a:hover { color: var(--accent); }
 		@media (max-width: 980px) { .hero-grid, .article-layout, .footer-grid { grid-template-columns: 1fr; } .toc-stack { position: static; } .controls { grid-template-columns: 1fr; } }
-		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { position: static; align-items: flex-start; border-radius: 22px; flex-direction: column; } .brand-name { font-size: 1.1rem; } .nav-links { width: 100%; justify-content: flex-start; gap: 4px; } .nav a:not(.brand) { padding: 7px 9px; font-size: .84rem; } .theme-toggle { right: 14px; bottom: 14px; width: 42px; height: 42px; } .hero, .article-shell { border-radius: 24px; padding: 16px; } .hero-actions, .post-actions, .pager { align-items: stretch; flex-direction: column; } .btn, .share-link { width: 100%; justify-content: center; text-align: center; } .section-heading { align-items: start; flex-direction: column; } .post-card-topline, .post-card-footer, .article-meta { align-items: flex-start; flex-direction: column; gap: 8px; } .card-preview { grid-template-columns: repeat(2, 1fr); } .post-content { font-size: 1rem; } .post-content p, .post-content li, .post-content figcaption, .post-content blockquote { overflow-wrap: anywhere; word-break: break-word; } .wide-media-frame { margin-inline: 0; padding: 8px; } .wide-media-frame figcaption { font-size: .8rem; } .post-content .interactive-embed iframe { min-height: 320px; } .asset-link-grid { grid-template-columns: 1fr; } .referral-form { grid-template-columns: 1fr; padding: 18px; } .referral-table { min-width: 780px; } pre { max-width: 100%; margin-inline: -8px; border-radius: 14px; } code { overflow-wrap: anywhere; } }
+		@media (max-width: 640px) { .container { width: min(100% - 20px, 1180px); padding-top: 10px; } .nav { align-items: flex-start; border-radius: 22px; flex-direction: column; } .nav-links { justify-content: flex-start; } .hero, .article-shell { border-radius: 24px; } .article-shell { padding: 20px 16px; } .article-shell h1 { font-size: clamp(1.85rem, 8vw, 2.75rem); line-height: 1.02; } .article-description { font-size: 1rem; } .post-content { font-size: 0.98rem; } .post-content p, .post-content li, .post-content figcaption, .post-content blockquote { overflow-wrap: anywhere; word-break: break-word; } .section-heading { align-items: start; flex-direction: column; } .card-preview { grid-template-columns: repeat(2, 1fr); } .post-actions, .pager, .article-meta { align-items: stretch; } .post-actions .share-link, .pager .btn { width: 100%; justify-content: center; } .post-content .media-scroll img { width: 760px; max-width: none; } .post-content figure.wide-media-frame { margin-inline: -6px; } .post-content pre { margin-inline: -6px; } }
 	</style>
 </head>
 <body>
@@ -1105,7 +554,6 @@ function renderPage(title: string, content: string, metaTags = ''): string {
 			<a class="brand" href="/" aria-label="Minte Blog home"><span class="brand-mark"><img src="${MINTE_FAVICON_URL}" alt="" width="42" height="42"></span><span class="brand-copy"><span class="brand-name">Minte.dev</span><span class="brand-subtitle">Build Log</span></span></a>
 			<div class="nav-links">
 				<a href="/#projects">Projects</a>
-				<a href="/#products">Products</a>
 				<a href="/#posts">Posts</a>
 				<a href="https://handybeaver.co/" target="_blank" rel="noopener">Handy Beaver</a>
 				<a href="https://kiamichibizconnect.com/" target="_blank" rel="noopener">KBC</a>
@@ -1312,7 +760,6 @@ app.get('/', async (c) => {
 	const index: PostIndex = JSON.parse(indexData);
 	const publishedPosts = index.posts.filter((p) => !p.draft && (p as any).category !== 'memory');
 	const featuredProjects = PROJECTS.slice(0, 6).map((project) => renderProjectCard(project)).join('');
-	const productStack = TOOL_LINKS.map((tool) => renderToolCard(tool)).join('');
 	const postsHtml = publishedPosts.map(renderPostCard).join('');
 	const topTags = Object.entries(index.tags)
 		.sort((a, b) => b[1] - a[1])
@@ -1352,41 +799,6 @@ app.get('/', async (c) => {
 				<p>These cards make the blog work as a portfolio and navigation hub, not just a dated archive.</p>
 			</div>
 			<div class="project-grid">${featuredProjects}</div>
-		</section>
-
-		<section class="section" id="products">
-			<div class="section-heading">
-				<div>
-					<p class="eyebrow">Products we use</p>
-					<h2>The tools and platforms behind the build log.</h2>
-				</div>
-				<p>A quick stack shelf for the products, developer platforms, and open repos powering Atlas / Minte projects. Photon is linked now and has a reserved referral spot for the final URL.</p>
-			</div>
-			<div class="tool-grid">${productStack}</div>
-		</section>
-
-		<section class="section" id="photon-referral-cta">
-			<div class="section-heading">
-				<div>
-					<p class="eyebrow">Photon referral</p>
-					<h2>Want 15% off Photon Spectrum?</h2>
-				</div>
-				<p>Send us the business details first. We’ll review the lead and submit it to Photon’s referral flow for you.</p>
-			</div>
-			<div class="project-grid">
-				<article class="project-card reveal-card compact" data-reveal-card style="--project-accent: #f97316">
-					<div class="card-ambient" aria-hidden="true"></div>
-					<div>
-						<p class="eyebrow">Photon referral</p>
-						<h3>Submit a business</h3>
-						<p>Photon’s current referral flow is a submission, not a public coupon code. We collect the intro, review it, then fill the Photon form ourselves.</p>
-					</div>
-					<div class="project-actions">
-						<a href="/photon-referral">Open intake form</a>
-						<a href="https://refer.photon.codes/" target="_blank" rel="noopener">Photon referral page</a>
-					</div>
-				</article>
-			</div>
 		</section>
 
 		<section class="section" id="posts">
@@ -1521,7 +933,6 @@ app.get('/posts/:slug', async (c) => {
 
 	const contentWithoutH1 = stripLeadingH1(post.content, post.title);
 	const htmlContent = enhanceRenderedMedia(addHeadingIds(await marked(contentWithoutH1)));
-	const assetGallery = renderAssetGallery(post);
 	const toc = buildTableOfContents(contentWithoutH1);
 	const project = inferProject(post);
 	const readingTime = estimateReadingTime(post.content, (post as any).readingTime);
@@ -1581,7 +992,6 @@ app.get('/posts/:slug', async (c) => {
 				<div class="post-content">
 					${htmlContent}
 				</div>
-				${assetGallery}
 				${relatedHtml}
 				<nav class="pager" aria-label="Post navigation">
 					${previousPost ? `<a class="btn" href="/posts/${previousPost.slug}">← ${escapeHtml(previousPost.title)}</a>` : '<span></span>'}
@@ -1780,26 +1190,7 @@ app.get('/api/posts/:slug', async (c) => {
 // Assets route: Serve static files from R2 assets/ folder
 app.get('/assets/*', async (c) => {
 	const path = c.req.path.replace('/assets/', 'assets/');
-	const rangeHeader = c.req.header('Range');
-	let object: R2ObjectBody | null = null;
-	let range: { offset: number; length?: number } | undefined;
-
-	if (rangeHeader) {
-		const head = await c.env.BLOG_BUCKET.head(path);
-		const size = head?.size ?? 0;
-		const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
-		if (match && size > 0) {
-			const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2] || 0));
-			const end = match[2] ? Number(match[2]) : size - 1;
-			if (Number.isFinite(start) && Number.isFinite(end) && start <= end && start < size) {
-				range = { offset: start, length: Math.min(end, size - 1) - start + 1 };
-				object = await c.env.BLOG_BUCKET.get(path, { range });
-			}
-		}
-		if (!object) return c.text('Range Not Satisfiable', 416, { 'Content-Range': `bytes */${size}` });
-	} else {
-		object = await c.env.BLOG_BUCKET.get(path);
-	}
+	const object = await c.env.BLOG_BUCKET.get(path);
 
 	if (!object) {
 		return c.notFound();
@@ -1807,20 +1198,12 @@ app.get('/assets/*', async (c) => {
 
 	const headers = new Headers();
 	object.writeHttpMetadata(headers);
-	if (!headers.has('Content-Type')) headers.set('Content-Type', assetContentType(path));
-	headers.set('Accept-Ranges', 'bytes');
 	headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-
-	if (range) {
-		const size = object.size;
-		const offset = range.offset;
-		const length = range.length ?? Math.max(0, size - offset);
-		headers.set('Content-Length', String(length));
-		headers.set('Content-Range', `bytes ${offset}-${offset + length - 1}/${size}`);
-		return new Response(object.body, { status: 206, headers });
+	headers.set('Accept-Ranges', 'bytes');
+	if (!headers.get('Content-Type') || headers.get('Content-Type') === 'application/octet-stream') {
+		headers.set('Content-Type', guessAssetContentType(path));
 	}
 
-	headers.set('Content-Length', String(object.size));
 	return new Response(object.body, {
 		headers,
 	});
@@ -1896,9 +1279,8 @@ app.post('/admin/generate-blog', async (c) => {
 	}
 
 	try {
-		// Generate public build note and protected memory digest
+		// Generate blog post
 		const post = await generateBlogPost(c.env.BLOG_BUCKET);
-		const memoryPost = await generateMemoryDigestPost(c.env.BLOG_BUCKET);
 		
 		// Publish to R2 + update index + purge cache
 		const result = await publishPost(
@@ -1907,17 +1289,11 @@ app.post('/admin/generate-blog', async (c) => {
 			c.env.CF_ZONE_ID,
 			c.env.CLOUDFLARE_API_TOKEN
 		);
-		const memoryResult = await publishPost(
-			c.env.BLOG_BUCKET,
-			memoryPost,
-			c.env.CF_ZONE_ID,
-			c.env.CLOUDFLARE_API_TOKEN
-		);
 		
-		if (!result.success || !memoryResult.success) {
+		if (!result.success) {
 			return c.json({ 
 				error: 'Blog publish failed', 
-				details: result.error || memoryResult.error
+				details: result.error 
 			}, 500);
 		}
 		
@@ -1925,7 +1301,6 @@ app.post('/admin/generate-blog', async (c) => {
 			success: true, 
 			message: 'Blog post generated and published',
 			url: result.url,
-			memoryUrl: memoryResult.url,
 			title: post.title,
 			slug: post.slug
 		});
@@ -1935,97 +1310,6 @@ app.post('/admin/generate-blog', async (c) => {
 			details: error instanceof Error ? error.message : String(error) 
 		}, 500);
 	}
-});
-
-// Photon referral intake
-app.get('/photon-referral', async (c) => {
-	const content = renderPhotonReferralForm();
-	return c.html(renderPage('Photon Referral', content));
-});
-
-app.post('/photon-referral', async (c) => {
-	const ip = c.req.header('CF-Connecting-IP') || 'unknown';
-	const rateLimit = await checkRateLimit(ip, 'photon-referral', 5, 3600);
-	if (!rateLimit.allowed) {
-		return c.html(renderPage('Photon Referral', renderPhotonReferralForm({}, 'You’ve hit the referral intake limit. Please try again later.')), 429);
-	}
-
-	const formData = await c.req.formData();
-	const businessName = readFormValue(formData, 'businessName');
-	const contactName = readFormValue(formData, 'contactName');
-	const email = readFormValue(formData, 'email');
-	const phone = readFormValue(formData, 'phone');
-	const companySize = readFormValue(formData, 'companySize');
-	const notes = readFormValue(formData, 'notes');
-	const marketingConsent = formData.get('marketingConsent') === 'yes';
-
-	const values: Partial<PhotonReferral> = {
-		businessName,
-		contactName,
-		email,
-		phone,
-		companySize,
-		notes,
-		marketingConsent,
-	};
-
-	if (!businessName || !contactName || !email || !marketingConsent) {
-		return c.html(renderPage('Photon Referral', renderPhotonReferralForm(values, 'Please fill out the required fields and confirm consent before submitting.')), 400);
-	}
-
-	const referral: PhotonReferral = {
-		id: buildPhotonReferralId(businessName),
-		createdAt: new Date().toISOString(),
-		status: 'new',
-		businessName,
-		contactName,
-		email,
-		phone: phone || undefined,
-		companySize: companySize || undefined,
-		notes: notes || undefined,
-		marketingConsent,
-		source: 'photon-referral-form',
-	};
-
-	await savePhotonReferral(c.env.BLOG_BUCKET, referral);
-	await notifyPhotonReferral(referral, c.env);
-
-	return c.html(renderPage('Photon Referral Saved', renderPhotonReferralSuccess(referral)));
-});
-
-app.get('/admin/photon-referrals', async (c) => {
-	const queryToken = c.req.query('token');
-	if (!isPhotonAdminAuthorized(c, c.env)) {
-		return c.json({ error: 'Unauthorized' }, 401);
-	}
-
-	const referrals = await loadPhotonReferrals(c.env.BLOG_BUCKET);
-	const response = c.html(renderPage('Photon Referrals', renderPhotonReferralAdmin(referrals)));
-	if (queryToken && queryToken === c.env.ADMIN_TOKEN) {
-		response.headers.append('Set-Cookie', buildPhotonAdminCookie(queryToken, new URL(c.req.url).protocol === 'https:'));
-	}
-	return response;
-});
-
-app.post('/admin/photon-referrals/:id/status', async (c) => {
-	if (!isPhotonAdminAuthorized(c, c.env)) {
-		return c.json({ error: 'Unauthorized' }, 401);
-	}
-
-	const id = c.req.param('id');
-	const formData = await c.req.formData();
-	const statusValue = readFormValue(formData, 'status');
-	if (!isPhotonReferralStatus(statusValue)) {
-		return c.html(renderPage('Photon Referrals', '<section class="section"><h1>Invalid status</h1><p>Status must be new, reviewed, submitted, confirmed, or rejected.</p></section>'), 400);
-	}
-
-	const { referral, previousStatus } = await updatePhotonReferralStatus(c.env.BLOG_BUCKET, id, statusValue);
-	if (!referral) {
-		return c.json({ error: 'Referral not found' }, 404);
-	}
-
-	await notifyPhotonReferralStatusChange(referral, c.env, previousStatus || 'new');
-	return c.redirect('/admin/photon-referrals', 303);
 });
 
 // 404 handler
@@ -2041,17 +1325,8 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (event
 	console.log('[Daily Blog] Cron triggered at', new Date().toISOString());
 	
 	try {
-		// Generate public build note and protected memory digest from yesterday's shared memory
+		// Generate blog post from yesterday's memory
 		const post = await generateBlogPost(env.BLOG_BUCKET, env.GITHUB_TOKEN);
-		const memoryPost = await generateMemoryDigestPost(env.BLOG_BUCKET);
-		let draftKey: string | null = null;
-		try {
-			const draft = await generateDetailedBlogDraft(env.BLOG_BUCKET, env.AI);
-			draftKey = (await saveBlogDraft(env.BLOG_BUCKET, draft)).key;
-			console.log('[Daily Blog] ✅ Private full-blog draft:', draftKey);
-		} catch (draftError) {
-			console.error('[Daily Blog] ⚠️ Full-blog draft failed; public update and memory will continue:', draftError);
-		}
 		
 		// Publish to R2 + update index + purge cache
 		const result = await publishPost(
@@ -2060,19 +1335,12 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (event
 			env.CF_ZONE_ID,
 			env.CLOUDFLARE_API_TOKEN
 		);
-		const memoryResult = await publishPost(
-			env.BLOG_BUCKET,
-			memoryPost,
-			env.CF_ZONE_ID,
-			env.CLOUDFLARE_API_TOKEN
-		);
 		
-		if (result.success && memoryResult.success) {
+		if (result.success) {
 			console.log('[Daily Blog] ✅ Published:', result.url);
-			console.log('[Daily Blog] ✅ Memory digest:', memoryResult.url);
 			console.log('[Daily Blog] Title:', post.title);
 		} else {
-			console.error('[Daily Blog] ❌ Failed:', result.error || memoryResult.error);
+			console.error('[Daily Blog] ❌ Failed:', result.error);
 		}
 	} catch (error) {
 		console.error('[Daily Blog] Error:', error instanceof Error ? error.message : String(error));
